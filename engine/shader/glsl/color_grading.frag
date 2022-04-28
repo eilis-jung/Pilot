@@ -19,8 +19,9 @@ void main()
     // Size of LUT in one dimension
     highp float size = 16.0;
 
-    // 
+    // sRGB values of 8 neighboring grid points
     highp vec3 rgbs[8];
+    // And their corresponding color samples
     highp vec4 colors[8];
 
     // Get interpolation weights. Actual weight starting from base_color is (1 - weight_next_x)
