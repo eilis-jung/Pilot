@@ -55,6 +55,8 @@ void Pilot::PVulkanManager::renderFrame(class Scene&                scene,
 
     this->prepareContext();
 
+    
+
     // reset ring buffer offset
     m_global_render_resource._storage_buffer._global_upload_ringbuffers_end[m_current_frame_index] =
         m_global_render_resource._storage_buffer._global_upload_ringbuffers_begin[m_current_frame_index];
@@ -130,7 +132,7 @@ void Pilot::PVulkanManager::renderFrame(class Scene&                scene,
     m_point_light_shadow_pass.draw();
 
     m_main_camera_pass.draw(
-        m_color_grading_pass, m_tone_mapping_pass, m_ui_pass, m_combine_ui_pass, current_swapchain_image_index, ui_state);
+        m_color_grading_pass, m_bloom_filter_pass, m_tone_mapping_pass, m_ui_pass, m_combine_ui_pass, current_swapchain_image_index, ui_state);
 
     // end command buffer
     VkResult res_end_command_buffer = m_vulkan_context._vkEndCommandBuffer(m_command_buffers[m_current_frame_index]);
@@ -262,7 +264,7 @@ void Pilot::PVulkanManager::renderFrameForward(class Scene&                scene
     m_point_light_shadow_pass.draw();
 
     m_main_camera_pass.drawForward(
-        m_color_grading_pass, m_tone_mapping_pass, m_ui_pass, m_combine_ui_pass, current_swapchain_image_index, ui_state);
+        m_color_grading_pass, m_bloom_filter_pass, m_tone_mapping_pass, m_ui_pass, m_combine_ui_pass, current_swapchain_image_index, ui_state);
 
     // end command buffer
     VkResult res_end_command_buffer = m_vulkan_context._vkEndCommandBuffer(m_command_buffers[m_current_frame_index]);
