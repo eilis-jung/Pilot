@@ -27,7 +27,35 @@ namespace Pilot
         void setupDescriptorSet();
     };
 
-    class PBloomFilterPass : public PRenderPassBase
+    class PBrightnessFilterPass : public PRenderPassBase
+    {
+    public:
+        void initialize(VkRenderPass render_pass, VkImageView input_attachment);
+        void draw();
+
+        void updateAfterFramebufferRecreate(VkImageView input_attachment);
+
+    private:
+        void setupDescriptorSetLayout();
+        void setupPipelines();
+        void setupDescriptorSet();
+    };
+
+    class PGaussianBlurXPass : public PRenderPassBase
+    {
+    public:
+        void initialize(VkRenderPass render_pass, VkImageView input_attachment);
+        void draw();
+
+        void updateAfterFramebufferRecreate(VkImageView input_attachment);
+
+    private:
+        void setupDescriptorSetLayout();
+        void setupPipelines();
+        void setupDescriptorSet();
+    };
+
+    class PGaussianBlurYPass : public PRenderPassBase
     {
     public:
         void initialize(VkRenderPass render_pass, VkImageView input_attachment);
@@ -108,7 +136,9 @@ namespace Pilot
         _main_camera_subpass_forward_lighting,
         _main_camera_subpass_tone_mapping,
         _main_camera_subpass_color_grading,
-        _main_camera_subpass_bloom_filter,
+        _main_camera_subpass_brightness_filter,
+        _main_camera_subpass_gaussian_blur_x,
+        _main_camera_subpass_gaussian_blur_y,
         _main_camera_subpass_ui,
         _main_camera_subpass_combine_ui,
         _main_camera_subpass_count
@@ -154,7 +184,9 @@ namespace Pilot
         void initialize();
 
         void draw(PColorGradingPass& color_grading_pass,
-                  PBloomFilterPass&  bloom_filter_pass,
+                  PBrightnessFilterPass&  brightness_filter_pass,
+                  PGaussianBlurXPass& gaussian_blur_x_pass,
+                  PGaussianBlurYPass& gaussian_blur_y_pass,
                   PToneMappingPass&  tone_mapping_pass,
                   PUIPass&           ui_pass,
                   PCombineUIPass&    combine_ui_pass,
@@ -163,7 +195,9 @@ namespace Pilot
 
         // legacy
         void drawForward(PColorGradingPass& color_grading_pass,
-                         PBloomFilterPass&  bloom_filter_pass,
+                         PBrightnessFilterPass&  brightness_filter_pass,
+                         PGaussianBlurXPass& gaussian_blur_x_pass,
+                         PGaussianBlurYPass& gaussian_blur_y_pass,
                          PToneMappingPass&  tone_mapping_pass,
                          PUIPass&           ui_pass,
                          PCombineUIPass&    combine_ui_pass,
