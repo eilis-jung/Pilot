@@ -93,8 +93,10 @@ namespace Pilot
         _main_camera_pass_gbuffer_c               = 2,
         _main_camera_pass_backup_buffer_odd       = 3,
         _main_camera_pass_backup_buffer_even      = 4,
+
         _main_camera_pass_depth                   = 5,
         _main_camera_pass_swap_chain_image        = 6,
+
         _main_camera_pass_custom_attachment_count = 5,
         _main_camera_pass_attachment_count        = 7,
     };

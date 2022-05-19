@@ -4,7 +4,7 @@
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_passes.h"
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_util.h"
 
-#include <color_grading_frag.h>
+#include <bloom_filter_frag.h>
 #include <post_process_vert.h>
 
 #include <iostream>
@@ -18,7 +18,6 @@ namespace Pilot
         setupPipelines();
         setupDescriptorSet();
         updateAfterFramebufferRecreate(input_attachment);
-        std::cout << "Initialized" << std::endl;
     }
 
     void PBloomFilterPass::setupDescriptorSetLayout()
@@ -77,7 +76,7 @@ namespace Pilot
         VkShaderModule vert_shader_module =
             PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, POST_PROCESS_VERT);
         VkShaderModule frag_shader_module =
-            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, COLOR_GRADING_FRAG);
+            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, BLOOM_FILTER_FRAG);
 
         VkPipelineShaderStageCreateInfo vert_pipeline_shader_stage_create_info {};
         vert_pipeline_shader_stage_create_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -181,7 +180,7 @@ namespace Pilot
         pipelineInfo.pDepthStencilState  = &depth_stencil_create_info;
         pipelineInfo.layout              = _render_pipelines[0].layout;
         pipelineInfo.renderPass          = _framebuffer.render_pass;
-        pipelineInfo.subpass             = _main_camera_subpass_color_grading;
+        pipelineInfo.subpass             = _main_camera_subpass_bloom_filter;
         pipelineInfo.basePipelineHandle  = VK_NULL_HANDLE;
         pipelineInfo.pDynamicState       = &dynamic_state_create_info;
 
@@ -218,7 +217,6 @@ namespace Pilot
 
     void PBloomFilterPass::updateAfterFramebufferRecreate(VkImageView input_attachment)
     {
-        std::cout<< "hererererer" <<std::endl;
         VkDescriptorImageInfo post_process_per_frame_input_attachment_info = {};
         post_process_per_frame_input_attachment_info.sampler =
             PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
@@ -276,7 +274,7 @@ namespace Pilot
 
         m_p_vulkan_context->_vkCmdBindPipeline(
             m_command_info._current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _render_pipelines[0].pipeline);
-        std::cout << "hahaa" << std::endl;
+
         m_p_vulkan_context->_vkCmdSetViewport(m_command_info._current_command_buffer, 0, 1, &m_command_info._viewport);
         m_p_vulkan_context->_vkCmdSetScissor(m_command_info._current_command_buffer, 0, 1, &m_command_info._scissor);
         

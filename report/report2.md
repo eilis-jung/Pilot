@@ -28,6 +28,8 @@ To add a subpass of a fragment shader into Pilot `PMainCameraPass`, the followin
 
 5. In `engine/source/runtime/function/render/source/vulkan_manager/passes/`, create a new file for the subpass code, implementing declarations in 1.
 
+   Note: remember to change the header file included!
+
 6. In `engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp`, in `PMainCameraPass::setupAttachments()`, add extra attachments if needed.
 
    In the same file, in `PMainCameraPass::setupRenderPass()`, ~line 250, add: `VkAttachmentReference`, `VkSubpassDescription`. Note that if using `backup_xxx_color_attachment_description`, every color attachment usage afterwards need to be reversed.
@@ -43,4 +45,6 @@ To add a subpass of a fragment shader into Pilot `PMainCameraPass`, the followin
 9. In `engine/source/runtime/function/render/source/vulkan_manager/vulkan_manager.cpp`, [line 135](https://github.com/eilis-jung/Pilot/blob/ca5c1ade250e952b409c25900e42294a24ecf67c/engine/source/runtime/function/render/source/vulkan_manager/vulkan_manager.cpp#L135) and [line 267](https://github.com/eilis-jung/Pilot/blob/ca5c1ade250e952b409c25900e42294a24ecf67c/engine/source/runtime/function/render/source/vulkan_manager/vulkan_manager.cpp#L267), add subpass as argument.
 
 10. In `engine/shader/glsl/`, add glsl code.
+
+11. In `engine/source/runtime/function/render/source/vulkan_manager/misc/descriptor_pool.cpp`, based on num of descriptors used, increase the pool size. 
 
