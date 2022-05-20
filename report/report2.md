@@ -46,5 +46,16 @@ To add a subpass of a fragment shader into Pilot `PMainCameraPass`, the followin
 
 10. In `engine/shader/glsl/`, add glsl code.
 
-11. In `engine/source/runtime/function/render/source/vulkan_manager/misc/descriptor_pool.cpp`, based on num of descriptors used, increase the pool size. 
+11. In `engine/source/runtime/function/render/source/vulkan_manager/misc/descriptor_pool.cpp`, based on num of descriptors used, increase the pool size.
 
+
+To add an attachment:
+
+
+1. In `engine/source/runtime/function/render/include/render/vulkan_manager/vulkan_passes.h`, [~line 125](https://github.com/BoomingTech/Pilot/blob/381c55486ccec3c50e1adca6cdeb08405fc2d816/engine/source/runtime/function/render/include/render/vulkan_manager/vulkan_passes.h#L81), add another enum before `_main_camera_pass_depth`. Since it's a custom attachment, remember to increase `_main_camera_pass_custom_attachment_count` by 1, and `_main_camera_pass_attachment_count` also by 1.
+
+2. In `engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp`, [here](https://github.com/BoomingTech/Pilot/blob/381c55486ccec3c50e1adca6cdeb08405fc2d816/engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L49), [here](https://github.com/BoomingTech/Pilot/blob/381c55486ccec3c50e1adca6cdeb08405fc2d816/engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L117), [here](https://github.com/BoomingTech/Pilot/blob/381c55486ccec3c50e1adca6cdeb08405fc2d816/engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L2042), [here](https://github.com/BoomingTech/Pilot/blob/381c55486ccec3c50e1adca6cdeb08405fc2d816/engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L2107), [here](https://github.com/BoomingTech/Pilot/blob/381c55486ccec3c50e1adca6cdeb08405fc2d816/engine/source/runtime/function/render/source/vulkan_manager/passes/main_camera.cpp#L2224), add initialization & clearing.
+
+3. In `engine/source/runtime/function/render/source/vulkan_manager/misc/descriptor_pool.cpp`, based on num of descriptors used, increase the pool size.
+
+4. In subpass cpp file, add new VkDescriptorSetLayoutBinding. In `updateAfterFramebufferRecreate(...)`, add `VkDescriptorImageInfo`, `VkWriteDescriptorSet` and increase corresponding `.dstBinding`.

@@ -48,6 +48,7 @@ namespace Pilot
         _framebuffer.attachments[_main_camera_pass_gbuffer_c].format          = VK_FORMAT_R8G8B8A8_SRGB;
         _framebuffer.attachments[_main_camera_pass_backup_buffer_odd].format  = VK_FORMAT_R16G16B16A16_SFLOAT;
         _framebuffer.attachments[_main_camera_pass_backup_buffer_even].format = VK_FORMAT_R16G16B16A16_SFLOAT;
+        _framebuffer.attachments[_main_camera_pass_brightness_buffer].format = VK_FORMAT_R16G16B16A16_SFLOAT;
 
         for (int i = 0; i < _main_camera_pass_custom_attachment_count; ++i)
         {
@@ -137,6 +138,18 @@ namespace Pilot
         backup_even_color_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         backup_even_color_attachment_description.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
         backup_even_color_attachment_description.finalLayout    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentDescription& brightness_buffer_attachment_description =
+            attachments[_main_camera_pass_brightness_buffer];
+        brightness_buffer_attachment_description.format =
+            _framebuffer.attachments[_main_camera_pass_brightness_buffer].format;
+        brightness_buffer_attachment_description.samples        = VK_SAMPLE_COUNT_1_BIT;
+        brightness_buffer_attachment_description.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        brightness_buffer_attachment_description.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        brightness_buffer_attachment_description.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        brightness_buffer_attachment_description.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        brightness_buffer_attachment_description.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+        brightness_buffer_attachment_description.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         VkAttachmentDescription& depth_attachment_description = attachments[_main_camera_pass_depth];
         depth_attachment_description.format                   = m_p_vulkan_context->_depth_image_format;
@@ -273,10 +286,10 @@ namespace Pilot
         color_grading_pass.preserveAttachmentCount = 0;
         color_grading_pass.pPreserveAttachments    = NULL;
 
-        // In brightness filter, input is odd_attachment, output is even_attachment.
-        // Thus even_attachment is used to store brightness data.
-        // Then in first gaussian blur, use both odd and even, then write into odd.
-        // In second gaussian blur, use both odd and even, still write into odd.
+        // In brightness filter, input is odd_attachment, output is brightness_buffer.
+        // Thus brightness_buffer is used to store brightness data.
+        // Then in first gaussian blur, use both odd and brightness_buffer, then write into even.
+        // In second gaussian blur, use both even and brightness_buffer, write into odd.
         // Following passes should use odd as input.
 
 
@@ -287,7 +300,7 @@ namespace Pilot
 
         VkAttachmentReference brightness_filter_pass_color_attachment_reference {};
         brightness_filter_pass_color_attachment_reference.attachment =
-            &backup_even_color_attachment_description - attachments;
+            &brightness_buffer_attachment_description - attachments;
         brightness_filter_pass_color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription& brightness_filter_pass   = subpasses[_main_camera_subpass_brightness_filter];
@@ -300,50 +313,66 @@ namespace Pilot
         brightness_filter_pass.preserveAttachmentCount = 0;
         brightness_filter_pass.pPreserveAttachments    = NULL;
 
-        VkAttachmentReference gaussian_blur_x_pass_input_attachment_reference {};
-        gaussian_blur_x_pass_input_attachment_reference.attachment =
+        // First round: input odd & brightness, write into even.
+        VkAttachmentReference gaussian_blur_x_pass_input_attachment_reference[2] = {};
+        gaussian_blur_x_pass_input_attachment_reference[0].attachment =
             &backup_odd_color_attachment_description - attachments;
-        gaussian_blur_x_pass_input_attachment_reference.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        gaussian_blur_x_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkAttachmentReference gaussian_blur_x_pass_color_attachment_reference {};
+        gaussian_blur_x_pass_input_attachment_reference[1].attachment =
+            &brightness_buffer_attachment_description - attachments;
+        gaussian_blur_x_pass_input_attachment_reference[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentReference gaussian_blur_x_pass_color_attachment_reference{};
         gaussian_blur_x_pass_color_attachment_reference.attachment =
             &backup_even_color_attachment_description - attachments;
         gaussian_blur_x_pass_color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription& gaussian_blur_x_pass   = subpasses[_main_camera_subpass_gaussian_blur_x];
         gaussian_blur_x_pass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        gaussian_blur_x_pass.inputAttachmentCount    = 1;
-        gaussian_blur_x_pass.pInputAttachments       = &gaussian_blur_x_pass_input_attachment_reference;
+        gaussian_blur_x_pass.inputAttachmentCount    = sizeof(gaussian_blur_x_pass_input_attachment_reference) /
+                                               sizeof(gaussian_blur_x_pass_input_attachment_reference[0]);
+        gaussian_blur_x_pass.pInputAttachments       = gaussian_blur_x_pass_input_attachment_reference;
         gaussian_blur_x_pass.colorAttachmentCount    = 1;
         gaussian_blur_x_pass.pColorAttachments       = &gaussian_blur_x_pass_color_attachment_reference;
         gaussian_blur_x_pass.pDepthStencilAttachment = NULL;
         gaussian_blur_x_pass.preserveAttachmentCount = 0;
         gaussian_blur_x_pass.pPreserveAttachments    = NULL;
 
-        VkAttachmentReference gaussian_blur_y_pass_input_attachment_reference {};
-        gaussian_blur_y_pass_input_attachment_reference.attachment =
-            &backup_odd_color_attachment_description - attachments;
-        gaussian_blur_y_pass_input_attachment_reference.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        // Second round: input even & brightness, write into odd.
+        VkAttachmentReference gaussian_blur_y_pass_input_attachment_reference[2] = {};
+        gaussian_blur_y_pass_input_attachment_reference[0].attachment =
+            &backup_even_color_attachment_description - attachments;
+        gaussian_blur_y_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+        gaussian_blur_y_pass_input_attachment_reference[1].attachment =
+            &brightness_buffer_attachment_description - attachments;
+        gaussian_blur_y_pass_input_attachment_reference[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        
         VkAttachmentReference gaussian_blur_y_pass_color_attachment_reference {};
         gaussian_blur_y_pass_color_attachment_reference.attachment =
-            &backup_even_color_attachment_description - attachments;
+            &backup_odd_color_attachment_description - attachments;
         gaussian_blur_y_pass_color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription& gaussian_blur_y_pass   = subpasses[_main_camera_subpass_gaussian_blur_y];
         gaussian_blur_y_pass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        gaussian_blur_y_pass.inputAttachmentCount    = 1;
-        gaussian_blur_y_pass.pInputAttachments       = &gaussian_blur_y_pass_input_attachment_reference;
+        gaussian_blur_y_pass.inputAttachmentCount    = sizeof(gaussian_blur_y_pass_input_attachment_reference) /
+                                               sizeof(gaussian_blur_y_pass_input_attachment_reference[0]);
+        gaussian_blur_y_pass.pInputAttachments       = gaussian_blur_y_pass_input_attachment_reference;
         gaussian_blur_y_pass.colorAttachmentCount    = 1;
         gaussian_blur_y_pass.pColorAttachments       = &gaussian_blur_y_pass_color_attachment_reference;
         gaussian_blur_y_pass.pDepthStencilAttachment = NULL;
         gaussian_blur_y_pass.preserveAttachmentCount = 0;
         gaussian_blur_y_pass.pPreserveAttachments    = NULL;
 
+
+        // Here should preserve odd, write into even.
         VkAttachmentReference ui_pass_color_attachment_reference {};
         ui_pass_color_attachment_reference.attachment = &backup_even_color_attachment_description - attachments;
         ui_pass_color_attachment_reference.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+        
         uint32_t ui_pass_preserve_attachment = &backup_odd_color_attachment_description - attachments;
 
         VkSubpassDescription& ui_pass   = subpasses[_main_camera_subpass_ui];
@@ -356,6 +385,7 @@ namespace Pilot
         ui_pass.preserveAttachmentCount = 1;
         ui_pass.pPreserveAttachments    = &ui_pass_preserve_attachment;
 
+        // Here should input both even and odd, write into something else.
         VkAttachmentReference combine_ui_pass_input_attachments_reference[2] = {};
         combine_ui_pass_input_attachments_reference[0].attachment =
             &backup_odd_color_attachment_description - attachments;
@@ -2115,6 +2145,7 @@ namespace Pilot
                 _framebuffer.attachments[_main_camera_pass_gbuffer_c].view,
                 _framebuffer.attachments[_main_camera_pass_backup_buffer_odd].view,
                 _framebuffer.attachments[_main_camera_pass_backup_buffer_even].view,
+                _framebuffer.attachments[_main_camera_pass_brightness_buffer].view,
                 m_p_vulkan_context->_depth_image_view,
                 m_p_vulkan_context->_swapchain_imageviews[i]};
 
@@ -2183,6 +2214,7 @@ namespace Pilot
             clear_values[_main_camera_pass_gbuffer_c].color          = {{0.0f, 0.0f, 0.0f, 0.0f}};
             clear_values[_main_camera_pass_backup_buffer_odd].color  = {{0.0f, 0.0f, 0.0f, 1.0f}};
             clear_values[_main_camera_pass_backup_buffer_even].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+            clear_values[_main_camera_pass_brightness_buffer].color  = {{0.0f, 0.0f, 0.0f, 1.0f}};
             clear_values[_main_camera_pass_depth].depthStencil       = {1.0f, 0};
             clear_values[_main_camera_pass_swap_chain_image].color   = {{0.0f, 0.0f, 0.0f, 1.0f}};
             renderpass_begin_info.clearValueCount                    = (sizeof(clear_values) / sizeof(clear_values[0]));
@@ -2315,6 +2347,7 @@ namespace Pilot
             clear_values[_main_camera_pass_gbuffer_c].color          = {{0.0f, 0.0f, 0.0f, 0.0f}};
             clear_values[_main_camera_pass_backup_buffer_odd].color  = {{0.0f, 0.0f, 0.0f, 1.0f}};
             clear_values[_main_camera_pass_backup_buffer_even].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+            clear_values[_main_camera_pass_brightness_buffer].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
             clear_values[_main_camera_pass_depth].depthStencil       = {1.0f, 0};
             clear_values[_main_camera_pass_swap_chain_image].color   = {{0.0f, 0.0f, 0.0f, 1.0f}};
             renderpass_begin_info.clearValueCount                    = (sizeof(clear_values) / sizeof(clear_values[0]));
