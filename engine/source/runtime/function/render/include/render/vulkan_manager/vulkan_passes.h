@@ -44,10 +44,10 @@ namespace Pilot
     class PGaussianBlurXPass : public PRenderPassBase
     {
     public:
-        void initialize(VkRenderPass render_pass, VkImageView input_attachment);
+        void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment);
         void draw();
 
-        void updateAfterFramebufferRecreate(VkImageView input_attachment);
+        void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment);
 
     private:
         void setupDescriptorSetLayout();
@@ -58,10 +58,10 @@ namespace Pilot
     class PGaussianBlurYPass : public PRenderPassBase
     {
     public:
-        void initialize(VkRenderPass render_pass, VkImageView input_attachment);
+        void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment);
         void draw();
 
-        void updateAfterFramebufferRecreate(VkImageView input_attachment);
+        void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment);
 
     private:
         void setupDescriptorSetLayout();
