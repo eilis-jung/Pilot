@@ -6,7 +6,7 @@
 
 #include <gaussian_blur_x_frag.h>
 // #include <gaussian_blur_x_vert.h>
-#include <deferred_lighting_vert.h>
+#include <gaussian_blur_x_vert.h>
 
 #include <iostream>
 
@@ -25,25 +25,11 @@ namespace Pilot
     {
         _descriptor_infos.resize(1);
 
-        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[3] = {};
-
-        VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
-            post_process_global_layout_bindings[0];
-        post_process_global_layout_input_attachment_binding.binding         = 0;
-        post_process_global_layout_input_attachment_binding.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_global_layout_input_attachment_binding.descriptorCount = 1;
-        post_process_global_layout_input_attachment_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutBinding& post_process_global_layout_brightness_attachment_binding =
-            post_process_global_layout_bindings[1];
-        post_process_global_layout_brightness_attachment_binding.binding         = 1;
-        post_process_global_layout_brightness_attachment_binding.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_global_layout_brightness_attachment_binding.descriptorCount = 1;
-        post_process_global_layout_brightness_attachment_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[1] = {};
 
         VkDescriptorSetLayoutBinding& post_process_global_layout_sampler_binding =
-            post_process_global_layout_bindings[2];
-        post_process_global_layout_sampler_binding.binding         = 2;
+            post_process_global_layout_bindings[0];
+        post_process_global_layout_sampler_binding.binding         = 0;
         post_process_global_layout_sampler_binding.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         post_process_global_layout_sampler_binding.descriptorCount = 1;
         post_process_global_layout_sampler_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -83,7 +69,7 @@ namespace Pilot
         }
 
         VkShaderModule vert_shader_module =
-            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, DEFERRED_LIGHTING_VERT);
+            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, GAUSSIAN_BLUR_X_VERT);
         VkShaderModule frag_shader_module =
             PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, GAUSSIAN_BLUR_X_FRAG);
 
@@ -226,55 +212,21 @@ namespace Pilot
 
     void PGaussianBlurXPass::updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment)
     {
-        VkDescriptorImageInfo post_process_per_frame_input_attachment_info = {};
-        post_process_per_frame_input_attachment_info.sampler =
-            PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        post_process_per_frame_input_attachment_info.imageView   = input_attachment;
-        post_process_per_frame_input_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        VkDescriptorImageInfo post_process_per_frame_brightness_attachment_info = {};
-        post_process_per_frame_brightness_attachment_info.sampler =
-            PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        post_process_per_frame_brightness_attachment_info.imageView   = brightness_attachment;
-        post_process_per_frame_brightness_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
         VkDescriptorImageInfo scene_image_info = {};
         scene_image_info.sampler =
             PVulkanUtil::getOrCreateLinearSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        scene_image_info.imageView =
-            m_p_global_render_resource->_color_grading_resource._color_grading_LUT_texture_image_view;
+        scene_image_info.imageView = brightness_attachment;
         scene_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 
-        VkWriteDescriptorSet post_process_descriptor_writes_info[3];
+        VkWriteDescriptorSet post_process_descriptor_writes_info[1];
 
-        VkWriteDescriptorSet& post_process_descriptor_input_attachment_write_info =
-            post_process_descriptor_writes_info[0];
-        post_process_descriptor_input_attachment_write_info.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        post_process_descriptor_input_attachment_write_info.pNext           = NULL;
-        post_process_descriptor_input_attachment_write_info.dstSet          = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_input_attachment_write_info.dstBinding      = 0;
-        post_process_descriptor_input_attachment_write_info.dstArrayElement = 0;
-        post_process_descriptor_input_attachment_write_info.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_descriptor_input_attachment_write_info.descriptorCount = 1;
-        post_process_descriptor_input_attachment_write_info.pImageInfo = &post_process_per_frame_input_attachment_info;
 
-        VkWriteDescriptorSet& post_process_descriptor_brightness_attachment_write_info =
-            post_process_descriptor_writes_info[1];
-        post_process_descriptor_brightness_attachment_write_info.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        post_process_descriptor_brightness_attachment_write_info.pNext           = NULL;
-        post_process_descriptor_brightness_attachment_write_info.dstSet          = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_brightness_attachment_write_info.dstBinding      = 1;
-        post_process_descriptor_brightness_attachment_write_info.dstArrayElement = 0;
-        post_process_descriptor_brightness_attachment_write_info.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_descriptor_brightness_attachment_write_info.descriptorCount = 1;
-        post_process_descriptor_brightness_attachment_write_info.pImageInfo = &post_process_per_frame_brightness_attachment_info;
-
-        VkWriteDescriptorSet& post_process_descriptor_sampler_write_info = post_process_descriptor_writes_info[2];
+        VkWriteDescriptorSet& post_process_descriptor_sampler_write_info = post_process_descriptor_writes_info[0];
         post_process_descriptor_sampler_write_info.sType                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         post_process_descriptor_sampler_write_info.pNext                 = NULL;
         post_process_descriptor_sampler_write_info.dstSet                = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_sampler_write_info.dstBinding            = 2;
+        post_process_descriptor_sampler_write_info.dstBinding            = 0;
         post_process_descriptor_sampler_write_info.dstArrayElement       = 0;
         post_process_descriptor_sampler_write_info.descriptorType        = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         post_process_descriptor_sampler_write_info.descriptorCount       = 1;

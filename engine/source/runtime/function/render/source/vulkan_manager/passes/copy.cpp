@@ -4,39 +4,29 @@
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_passes.h"
 #include "runtime/function/render/include/render/vulkan_manager/vulkan_util.h"
 
-#include <gaussian_blur_y_frag.h>
-// #include <post_process_vert.h>
-#include <gaussian_blur_x_vert.h>
-
-#include <iostream>
+#include <copy_frag.h>
+#include <post_process_vert.h>
 
 namespace Pilot
 {
-    void PGaussianBlurYPass::initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment)
+    void PCopyPass::initialize(VkRenderPass render_pass, VkImageView input_attachment)
     {
         _framebuffer.render_pass = render_pass;
         setupDescriptorSetLayout();
         setupPipelines();
         setupDescriptorSet();
-        updateAfterFramebufferRecreate(input_attachment, brightness_attachment);
+        updateAfterFramebufferRecreate(input_attachment);
     }
 
-    void PGaussianBlurYPass::setupDescriptorSetLayout()
+    void PCopyPass::setupDescriptorSetLayout()
     {
         _descriptor_infos.resize(1);
 
-        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[2] = {};
-
-        VkDescriptorSetLayoutBinding& post_process_global_layout_sampler_binding =
-            post_process_global_layout_bindings[0];
-        post_process_global_layout_sampler_binding.binding         = 0;
-        post_process_global_layout_sampler_binding.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        post_process_global_layout_sampler_binding.descriptorCount = 1;
-        post_process_global_layout_sampler_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[1] = {};
 
         VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
-            post_process_global_layout_bindings[1];
-        post_process_global_layout_input_attachment_binding.binding         = 1;
+            post_process_global_layout_bindings[0];
+        post_process_global_layout_input_attachment_binding.binding         = 0;
         post_process_global_layout_input_attachment_binding.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_global_layout_input_attachment_binding.descriptorCount = 1;
         post_process_global_layout_input_attachment_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -58,7 +48,7 @@ namespace Pilot
         }
     }
 
-    void PGaussianBlurYPass::setupPipelines()
+    void PCopyPass::setupPipelines()
     {
         _render_pipelines.resize(1);
         
@@ -76,9 +66,9 @@ namespace Pilot
         }
 
         VkShaderModule vert_shader_module =
-            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, GAUSSIAN_BLUR_X_VERT);
+            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, POST_PROCESS_VERT);
         VkShaderModule frag_shader_module =
-            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, GAUSSIAN_BLUR_Y_FRAG);
+            PVulkanUtil::createShaderModule(m_p_vulkan_context->_device, COPY_FRAG);
 
         VkPipelineShaderStageCreateInfo vert_pipeline_shader_stage_create_info {};
         vert_pipeline_shader_stage_create_info.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -182,7 +172,7 @@ namespace Pilot
         pipelineInfo.pDepthStencilState  = &depth_stencil_create_info;
         pipelineInfo.layout              = _render_pipelines[0].layout;
         pipelineInfo.renderPass          = _framebuffer.render_pass;
-        pipelineInfo.subpass             = _main_camera_subpass_gaussian_blur_y;
+        pipelineInfo.subpass             = _main_camera_subpass_copy;
         pipelineInfo.basePipelineHandle  = VK_NULL_HANDLE;
         pipelineInfo.pDynamicState       = &dynamic_state_create_info;
 
@@ -200,7 +190,7 @@ namespace Pilot
         vkDestroyShaderModule(m_p_vulkan_context->_device, frag_shader_module, nullptr);
     }
 
-    void PGaussianBlurYPass::setupDescriptorSet()
+    void PCopyPass::setupDescriptorSet()
     {
         VkDescriptorSetAllocateInfo post_process_global_descriptor_set_alloc_info;
         post_process_global_descriptor_set_alloc_info.sType          = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -217,39 +207,22 @@ namespace Pilot
         }
     }
 
-    void PGaussianBlurYPass::updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment)
+    void PCopyPass::updateAfterFramebufferRecreate(VkImageView input_attachment)
     {
-
-        VkDescriptorImageInfo scene_image_info = {};
-        scene_image_info.sampler =
-            PVulkanUtil::getOrCreateLinearSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        scene_image_info.imageView = brightness_attachment;
-        scene_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
         VkDescriptorImageInfo post_process_per_frame_input_attachment_info = {};
         post_process_per_frame_input_attachment_info.sampler =
             PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
         post_process_per_frame_input_attachment_info.imageView   = input_attachment;
         post_process_per_frame_input_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkWriteDescriptorSet post_process_descriptor_writes_info[2];
-
-        VkWriteDescriptorSet& post_process_descriptor_sampler_write_info = post_process_descriptor_writes_info[0];
-        post_process_descriptor_sampler_write_info.sType                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        post_process_descriptor_sampler_write_info.pNext                 = NULL;
-        post_process_descriptor_sampler_write_info.dstSet                = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_sampler_write_info.dstBinding            = 0;
-        post_process_descriptor_sampler_write_info.dstArrayElement       = 0;
-        post_process_descriptor_sampler_write_info.descriptorType        = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        post_process_descriptor_sampler_write_info.descriptorCount       = 1;
-        post_process_descriptor_sampler_write_info.pImageInfo            = &scene_image_info;
+        VkWriteDescriptorSet post_process_descriptor_writes_info[1];
 
         VkWriteDescriptorSet& post_process_descriptor_input_attachment_write_info =
-            post_process_descriptor_writes_info[1];
+            post_process_descriptor_writes_info[0];
         post_process_descriptor_input_attachment_write_info.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         post_process_descriptor_input_attachment_write_info.pNext           = NULL;
         post_process_descriptor_input_attachment_write_info.dstSet          = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_input_attachment_write_info.dstBinding      = 1;
+        post_process_descriptor_input_attachment_write_info.dstBinding      = 0;
         post_process_descriptor_input_attachment_write_info.dstArrayElement = 0;
         post_process_descriptor_input_attachment_write_info.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_descriptor_input_attachment_write_info.descriptorCount = 1;
@@ -264,13 +237,13 @@ namespace Pilot
                                NULL);
     }
 
-    void PGaussianBlurYPass::draw()
+    void PCopyPass::draw()
     {
         
         if (m_render_config._enable_debug_untils_label)
         {
             VkDebugUtilsLabelEXT label_info = {
-                VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "Gaussian Blur Y", {1.0f, 1.0f, 1.0f, 1.0f}};
+                VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "Copy", {1.0f, 1.0f, 1.0f, 1.0f}};
             m_p_vulkan_context->_vkCmdBeginDebugUtilsLabelEXT(m_command_info._current_command_buffer, &label_info);
         }
         

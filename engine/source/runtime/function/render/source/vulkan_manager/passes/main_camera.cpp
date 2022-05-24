@@ -59,7 +59,8 @@ namespace Pilot
                                      _framebuffer.attachments[i].format,
                                      VK_IMAGE_TILING_OPTIMAL,
                                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT |
-                                         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                                         VK_IMAGE_USAGE_SAMPLED_BIT,
+                                        //  | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                      _framebuffer.attachments[i].image,
                                      _framebuffer.attachments[i].mem,
@@ -288,10 +289,6 @@ namespace Pilot
 
         // In brightness filter, input is odd_attachment, output is brightness_buffer.
         // Thus brightness_buffer is used to store brightness data.
-        // Then in first gaussian blur, use both odd and brightness_buffer, then write into even.
-        // In second gaussian blur, use both even and brightness_buffer, write into odd.
-        // Following passes should use odd as input.
-
 
         VkAttachmentReference brightness_filter_pass_input_attachment_reference {};
         brightness_filter_pass_input_attachment_reference.attachment =
@@ -313,20 +310,19 @@ namespace Pilot
         brightness_filter_pass.preserveAttachmentCount = 0;
         brightness_filter_pass.pPreserveAttachments    = NULL;
 
-        // First round: input odd & brightness, write into even.
-        VkAttachmentReference gaussian_blur_x_pass_input_attachment_reference[2] = {};
-        gaussian_blur_x_pass_input_attachment_reference[0].attachment =
-            &backup_odd_color_attachment_description - attachments;
-        gaussian_blur_x_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        // First round: sample from brightness, write into even, preserve odd.
+        VkAttachmentReference gaussian_blur_x_pass_input_attachment_reference[1] = {};
 
-        gaussian_blur_x_pass_input_attachment_reference[1].attachment =
+        gaussian_blur_x_pass_input_attachment_reference[0].attachment =
             &brightness_buffer_attachment_description - attachments;
-        gaussian_blur_x_pass_input_attachment_reference[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        gaussian_blur_x_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         VkAttachmentReference gaussian_blur_x_pass_color_attachment_reference{};
         gaussian_blur_x_pass_color_attachment_reference.attachment =
             &backup_even_color_attachment_description - attachments;
         gaussian_blur_x_pass_color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        uint32_t gaussian_blur_x_pass_preserve_attachment = &backup_odd_color_attachment_description - attachments;
 
         VkSubpassDescription& gaussian_blur_x_pass   = subpasses[_main_camera_subpass_gaussian_blur_x];
         gaussian_blur_x_pass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -336,23 +332,22 @@ namespace Pilot
         gaussian_blur_x_pass.colorAttachmentCount    = 1;
         gaussian_blur_x_pass.pColorAttachments       = &gaussian_blur_x_pass_color_attachment_reference;
         gaussian_blur_x_pass.pDepthStencilAttachment = NULL;
-        gaussian_blur_x_pass.preserveAttachmentCount = 0;
-        gaussian_blur_x_pass.pPreserveAttachments    = NULL;
+        gaussian_blur_x_pass.preserveAttachmentCount = 1;
+        gaussian_blur_x_pass.pPreserveAttachments    = &gaussian_blur_x_pass_preserve_attachment;
 
-        // Second round: input even & brightness, write into odd.
+        // Second round: input odd, sample from even, write into brightness.
         VkAttachmentReference gaussian_blur_y_pass_input_attachment_reference[2] = {};
         gaussian_blur_y_pass_input_attachment_reference[0].attachment =
             &backup_even_color_attachment_description - attachments;
         gaussian_blur_y_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
         gaussian_blur_y_pass_input_attachment_reference[1].attachment =
-            &brightness_buffer_attachment_description - attachments;
+            &backup_odd_color_attachment_description - attachments;
         gaussian_blur_y_pass_input_attachment_reference[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        
         VkAttachmentReference gaussian_blur_y_pass_color_attachment_reference {};
         gaussian_blur_y_pass_color_attachment_reference.attachment =
-            &backup_odd_color_attachment_description - attachments;
+            &brightness_buffer_attachment_description - attachments;
         gaussian_blur_y_pass_color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription& gaussian_blur_y_pass   = subpasses[_main_camera_subpass_gaussian_blur_y];
@@ -366,6 +361,29 @@ namespace Pilot
         gaussian_blur_y_pass.preserveAttachmentCount = 0;
         gaussian_blur_y_pass.pPreserveAttachments    = NULL;
 
+
+        // Third round: input brightness, write into odd.
+        VkAttachmentReference copy_pass_input_attachment_reference[1] = {};
+
+        copy_pass_input_attachment_reference[0].attachment =
+            &brightness_buffer_attachment_description - attachments;
+        copy_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        VkAttachmentReference copy_pass_color_attachment_reference {};
+        copy_pass_color_attachment_reference.attachment =
+            &backup_odd_color_attachment_description - attachments;
+        copy_pass_color_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        VkSubpassDescription& copy_pass   = subpasses[_main_camera_subpass_copy];
+        copy_pass.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        copy_pass.inputAttachmentCount    = sizeof(copy_pass_input_attachment_reference) /
+                                               sizeof(copy_pass_input_attachment_reference[0]);
+        copy_pass.pInputAttachments       = copy_pass_input_attachment_reference;
+        copy_pass.colorAttachmentCount    = 1;
+        copy_pass.pColorAttachments       = &copy_pass_color_attachment_reference;
+        copy_pass.pDepthStencilAttachment = NULL;
+        copy_pass.preserveAttachmentCount = 0;
+        copy_pass.pPreserveAttachments    = NULL;
 
         // Here should preserve odd, write into even.
         VkAttachmentReference ui_pass_color_attachment_reference {};
@@ -409,7 +427,7 @@ namespace Pilot
         combine_ui_pass.preserveAttachmentCount = 0;
         combine_ui_pass.pPreserveAttachments    = NULL;
 
-        VkSubpassDependency dependencies[10] = {};
+        VkSubpassDependency dependencies[11] = {};
 
         VkSubpassDependency& deferred_lighting_pass_depend_on_shadow_map_pass = dependencies[0];
         deferred_lighting_pass_depend_on_shadow_map_pass.srcSubpass           = VK_SUBPASS_EXTERNAL;
@@ -462,41 +480,50 @@ namespace Pilot
         VkSubpassDependency& brightness_filter_pass_depend_on_color_grading_pass = dependencies[5];
         brightness_filter_pass_depend_on_color_grading_pass.srcSubpass           = _main_camera_subpass_color_grading;
         brightness_filter_pass_depend_on_color_grading_pass.dstSubpass           = _main_camera_subpass_brightness_filter;
-        brightness_filter_pass_depend_on_color_grading_pass.srcStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        brightness_filter_pass_depend_on_color_grading_pass.srcStageMask    = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         brightness_filter_pass_depend_on_color_grading_pass.dstStageMask    = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        brightness_filter_pass_depend_on_color_grading_pass.srcAccessMask   = VK_ACCESS_SHADER_WRITE_BIT;
+        brightness_filter_pass_depend_on_color_grading_pass.srcAccessMask   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
         brightness_filter_pass_depend_on_color_grading_pass.dstAccessMask   = VK_ACCESS_SHADER_READ_BIT;
         brightness_filter_pass_depend_on_color_grading_pass.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
         VkSubpassDependency& gaussian_blur_x_pass_depend_on_brightness_filter_pass = dependencies[6];
         gaussian_blur_x_pass_depend_on_brightness_filter_pass.srcSubpass           = _main_camera_subpass_brightness_filter;
         gaussian_blur_x_pass_depend_on_brightness_filter_pass.dstSubpass           = _main_camera_subpass_gaussian_blur_x;
-        gaussian_blur_x_pass_depend_on_brightness_filter_pass.srcStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        gaussian_blur_x_pass_depend_on_brightness_filter_pass.srcStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         gaussian_blur_x_pass_depend_on_brightness_filter_pass.dstStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        gaussian_blur_x_pass_depend_on_brightness_filter_pass.srcAccessMask        = 0;
-        gaussian_blur_x_pass_depend_on_brightness_filter_pass.dstAccessMask        = 0;
+        gaussian_blur_x_pass_depend_on_brightness_filter_pass.srcAccessMask        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        gaussian_blur_x_pass_depend_on_brightness_filter_pass.dstAccessMask        = VK_ACCESS_SHADER_READ_BIT;
         gaussian_blur_x_pass_depend_on_brightness_filter_pass.dependencyFlags      = VK_DEPENDENCY_BY_REGION_BIT;
 
         VkSubpassDependency& gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass = dependencies[7];
         gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.srcSubpass           = _main_camera_subpass_gaussian_blur_x;
         gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.dstSubpass           = _main_camera_subpass_gaussian_blur_y;
-        gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.srcStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.srcStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.dstStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.srcAccessMask        = 0;
-        gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.dstAccessMask        = 0;
+        gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.srcAccessMask        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.dstAccessMask        = VK_ACCESS_SHADER_READ_BIT;
         gaussian_blur_y_pass_depend_on_gaussian_blur_x_pass.dependencyFlags      = VK_DEPENDENCY_BY_REGION_BIT;
 
+        VkSubpassDependency& copy_pass_depend_on_gaussian_blur_y_pass = dependencies[8];
+        copy_pass_depend_on_gaussian_blur_y_pass.srcSubpass           = _main_camera_subpass_gaussian_blur_y;
+        copy_pass_depend_on_gaussian_blur_y_pass.dstSubpass           = _main_camera_subpass_copy;
+        copy_pass_depend_on_gaussian_blur_y_pass.srcStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        copy_pass_depend_on_gaussian_blur_y_pass.dstStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        copy_pass_depend_on_gaussian_blur_y_pass.srcAccessMask        = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        copy_pass_depend_on_gaussian_blur_y_pass.dstAccessMask        = VK_ACCESS_SHADER_READ_BIT;
+        copy_pass_depend_on_gaussian_blur_y_pass.dependencyFlags      = VK_DEPENDENCY_BY_REGION_BIT;
 
-        VkSubpassDependency& ui_pass_depend_on_gaussian_blur_y_pass = dependencies[8];
-        ui_pass_depend_on_gaussian_blur_y_pass.srcSubpass           = _main_camera_subpass_gaussian_blur_y;
-        ui_pass_depend_on_gaussian_blur_y_pass.dstSubpass           = _main_camera_subpass_ui;
-        ui_pass_depend_on_gaussian_blur_y_pass.srcStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        ui_pass_depend_on_gaussian_blur_y_pass.dstStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        ui_pass_depend_on_gaussian_blur_y_pass.srcAccessMask        = 0;
-        ui_pass_depend_on_gaussian_blur_y_pass.dstAccessMask        = 0;
-        ui_pass_depend_on_gaussian_blur_y_pass.dependencyFlags      = VK_DEPENDENCY_BY_REGION_BIT;
 
-        VkSubpassDependency& combine_ui_pass_depend_on_ui_pass = dependencies[9];
+        VkSubpassDependency& ui_pass_depend_on_copy_pass = dependencies[9];
+        ui_pass_depend_on_copy_pass.srcSubpass           = _main_camera_subpass_copy;
+        ui_pass_depend_on_copy_pass.dstSubpass           = _main_camera_subpass_ui;
+        ui_pass_depend_on_copy_pass.srcStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        ui_pass_depend_on_copy_pass.dstStageMask         = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        ui_pass_depend_on_copy_pass.srcAccessMask        = VK_ACCESS_SHADER_WRITE_BIT;
+        ui_pass_depend_on_copy_pass.dstAccessMask        = VK_ACCESS_SHADER_READ_BIT;
+        ui_pass_depend_on_copy_pass.dependencyFlags      = VK_DEPENDENCY_BY_REGION_BIT;
+
+        VkSubpassDependency& combine_ui_pass_depend_on_ui_pass = dependencies[10];
         combine_ui_pass_depend_on_ui_pass.srcSubpass           = _main_camera_subpass_ui;
         combine_ui_pass_depend_on_ui_pass.dstSubpass           = _main_camera_subpass_combine_ui;
         combine_ui_pass_depend_on_ui_pass.srcStageMask         = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -2194,6 +2221,7 @@ namespace Pilot
                                PBrightnessFilterPass&  brightness_filter_pass,
                                PGaussianBlurXPass& gaussian_blur_x_pass,
                                PGaussianBlurYPass& gaussian_blur_y_pass,
+                               PCopyPass& copy_pass,
                                PToneMappingPass&  tone_mapping_pass,
                                PUIPass&           ui_pass,
                                PCombineUIPass&    combine_ui_pass,
@@ -2292,6 +2320,10 @@ namespace Pilot
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
+        copy_pass.draw();
+
+        m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
+
         VkClearAttachment clear_attachments[1];
         clear_attachments[0].aspectMask                  = VK_IMAGE_ASPECT_COLOR_BIT;
         clear_attachments[0].colorAttachment             = 0;
@@ -2327,6 +2359,7 @@ namespace Pilot
                                       PBrightnessFilterPass&  brightness_filter_pass,
                                       PGaussianBlurXPass& gaussian_blur_x_pass,
                                       PGaussianBlurYPass& gaussian_blur_y_pass,
+                                      PCopyPass& copy_pass,
                                       PToneMappingPass&  tone_mapping_pass,
                                       PUIPass&           ui_pass,
                                       PCombineUIPass&    combine_ui_pass,
@@ -2396,6 +2429,10 @@ namespace Pilot
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
         gaussian_blur_y_pass.draw();
+
+        m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
+
+        copy_pass.draw();
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 

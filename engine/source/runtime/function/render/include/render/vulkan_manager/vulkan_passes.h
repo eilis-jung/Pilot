@@ -13,7 +13,31 @@ namespace Pilot
         VkImageView directional_light_shadow_color_image_view;
     };
 
+    // struct PGaussianBlurXHelperInfo
+    // {
+    //     VkImageView brightness_sample_x_view;
+    // };
+
+    // struct PGaussianBlurYHelperInfo
+    // {
+    //     VkImageView brightness_sample_y_view;
+    // };
+
     class PColorGradingPass : public PRenderPassBase
+    {
+    public:
+        void initialize(VkRenderPass render_pass, VkImageView input_attachment);
+        void draw();
+
+        void updateAfterFramebufferRecreate(VkImageView input_attachment);
+
+    private:
+        void setupDescriptorSetLayout();
+        void setupPipelines();
+        void setupDescriptorSet();
+    };
+
+    class PCopyPass : public PRenderPassBase
     {
     public:
         void initialize(VkRenderPass render_pass, VkImageView input_attachment);
@@ -140,6 +164,7 @@ namespace Pilot
         _main_camera_subpass_brightness_filter,
         _main_camera_subpass_gaussian_blur_x,
         _main_camera_subpass_gaussian_blur_y,
+        _main_camera_subpass_copy,
         _main_camera_subpass_ui,
         _main_camera_subpass_combine_ui,
         _main_camera_subpass_count
@@ -188,6 +213,7 @@ namespace Pilot
                   PBrightnessFilterPass&  brightness_filter_pass,
                   PGaussianBlurXPass& gaussian_blur_x_pass,
                   PGaussianBlurYPass& gaussian_blur_y_pass,
+                  PCopyPass& copy_pass,
                   PToneMappingPass&  tone_mapping_pass,
                   PUIPass&           ui_pass,
                   PCombineUIPass&    combine_ui_pass,
@@ -199,6 +225,7 @@ namespace Pilot
                          PBrightnessFilterPass&  brightness_filter_pass,
                          PGaussianBlurXPass& gaussian_blur_x_pass,
                          PGaussianBlurYPass& gaussian_blur_y_pass,
+                         PCopyPass& copy_pass,
                          PToneMappingPass&  tone_mapping_pass,
                          PUIPass&           ui_pass,
                          PCombineUIPass&    combine_ui_pass,
