@@ -69,7 +69,7 @@ namespace Pilot
     {
     public:
         void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment);
-        void draw();
+        void draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
 
         void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment);
 
@@ -83,7 +83,7 @@ namespace Pilot
     {
     public:
         void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment);
-        void draw();
+        void draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
 
         void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment);
 

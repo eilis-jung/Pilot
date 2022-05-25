@@ -2312,11 +2312,11 @@ namespace Pilot
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_x_pass.draw();
+        gaussian_blur_x_pass.draw(m_mesh_perframe_storage_buffer_object);
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_y_pass.draw();
+        gaussian_blur_y_pass.draw(m_mesh_perframe_storage_buffer_object);
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -2424,11 +2424,11 @@ namespace Pilot
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_x_pass.draw();
+        gaussian_blur_x_pass.draw(m_mesh_perframe_storage_buffer_object);
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_y_pass.draw();
+        gaussian_blur_y_pass.draw(m_mesh_perframe_storage_buffer_object);
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 

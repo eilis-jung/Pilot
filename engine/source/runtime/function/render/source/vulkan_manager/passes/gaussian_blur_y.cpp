@@ -25,7 +25,7 @@ namespace Pilot
     {
         _descriptor_infos.resize(1);
 
-        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[2] = {};
+        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[3] = {};
 
         VkDescriptorSetLayoutBinding& post_process_global_layout_sampler_binding =
             post_process_global_layout_bindings[0];
@@ -34,12 +34,23 @@ namespace Pilot
         post_process_global_layout_sampler_binding.descriptorCount = 1;
         post_process_global_layout_sampler_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
+        //add ubo binding at 1
+        VkDescriptorSetLayoutBinding& post_process_global_layout_storage_buffer_binding =
             post_process_global_layout_bindings[1];
-        post_process_global_layout_input_attachment_binding.binding         = 1;
+        post_process_global_layout_storage_buffer_binding.binding           = 1;
+        post_process_global_layout_storage_buffer_binding.descriptorType    = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        post_process_global_layout_storage_buffer_binding.descriptorCount   = 1;
+        post_process_global_layout_storage_buffer_binding.stageFlags        = VK_SHADER_STAGE_FRAGMENT_BIT;
+        post_process_global_layout_storage_buffer_binding.pImmutableSamplers = NULL;
+
+        VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
+            post_process_global_layout_bindings[2];
+        post_process_global_layout_input_attachment_binding.binding         = 2;
         post_process_global_layout_input_attachment_binding.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_global_layout_input_attachment_binding.descriptorCount = 1;
         post_process_global_layout_input_attachment_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+
 
         VkDescriptorSetLayoutCreateInfo post_process_global_layout_create_info;
         post_process_global_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -226,13 +237,24 @@ namespace Pilot
         scene_image_info.imageView = brightness_attachment;
         scene_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+        // Input ubo info
+        VkDescriptorBufferInfo mesh_perframe_storage_buffer_info = {};
+        // this offset plus dynamic_offset should not be greater than the size of the buffer
+        mesh_perframe_storage_buffer_info.offset = 0;
+        // the range means the size actually used by the shader per draw call
+        mesh_perframe_storage_buffer_info.range = sizeof(MeshPerframeStorageBufferObject);
+        mesh_perframe_storage_buffer_info.buffer =
+            m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer;
+        assert(mesh_perframe_storage_buffer_info.range <
+               m_p_global_render_resource->_storage_buffer._max_storage_buffer_range);
+
         VkDescriptorImageInfo post_process_per_frame_input_attachment_info = {};
         post_process_per_frame_input_attachment_info.sampler =
             PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
         post_process_per_frame_input_attachment_info.imageView   = input_attachment;
         post_process_per_frame_input_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkWriteDescriptorSet post_process_descriptor_writes_info[2];
+        VkWriteDescriptorSet post_process_descriptor_writes_info[3];
 
         VkWriteDescriptorSet& post_process_descriptor_sampler_write_info = post_process_descriptor_writes_info[0];
         post_process_descriptor_sampler_write_info.sType                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -244,12 +266,22 @@ namespace Pilot
         post_process_descriptor_sampler_write_info.descriptorCount       = 1;
         post_process_descriptor_sampler_write_info.pImageInfo            = &scene_image_info;
 
+        VkWriteDescriptorSet& mesh_descriptor_writes_info = post_process_descriptor_writes_info[1];
+        mesh_descriptor_writes_info.sType                                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        mesh_descriptor_writes_info.pNext                                 = NULL;
+        mesh_descriptor_writes_info.dstSet                                = _descriptor_infos[0].descriptor_set;
+        mesh_descriptor_writes_info.dstBinding                            = 1;
+        mesh_descriptor_writes_info.dstArrayElement                       = 0;
+        mesh_descriptor_writes_info.descriptorType                        = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        mesh_descriptor_writes_info.descriptorCount                       = 1;
+        mesh_descriptor_writes_info.pBufferInfo                           = &mesh_perframe_storage_buffer_info;
+
         VkWriteDescriptorSet& post_process_descriptor_input_attachment_write_info =
-            post_process_descriptor_writes_info[1];
+            post_process_descriptor_writes_info[2];
         post_process_descriptor_input_attachment_write_info.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         post_process_descriptor_input_attachment_write_info.pNext           = NULL;
         post_process_descriptor_input_attachment_write_info.dstSet          = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_input_attachment_write_info.dstBinding      = 1;
+        post_process_descriptor_input_attachment_write_info.dstBinding      = 2;
         post_process_descriptor_input_attachment_write_info.dstArrayElement = 0;
         post_process_descriptor_input_attachment_write_info.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         post_process_descriptor_input_attachment_write_info.descriptorCount = 1;
@@ -264,7 +296,7 @@ namespace Pilot
                                NULL);
     }
 
-    void PGaussianBlurYPass::draw()
+    void PGaussianBlurYPass::draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object)
     {
         
         if (m_render_config._enable_debug_untils_label)
@@ -274,6 +306,23 @@ namespace Pilot
             m_p_vulkan_context->_vkCmdBeginDebugUtilsLabelEXT(m_command_info._current_command_buffer, &label_info);
         }
         
+        //add extra info for blur effects
+        VkExtent2D v2 = m_p_vulkan_context->_swapchain_extent;
+        m_mesh_perframe_storage_buffer_object.screen_resolution =
+            glm::vec4(float(m_p_vulkan_context->_swapchain_extent.width), float(m_p_vulkan_context->_swapchain_extent.height), 0.0f, 0.0f); 
+        m_mesh_perframe_storage_buffer_object.editor_screen_resolution = glm::vec4((m_command_info._viewport.x),
+                                                                                   (m_command_info._viewport.y),
+                                                                                   (m_command_info._viewport.width),
+                                                                                   (m_command_info._viewport.height));
+
+        m_p_global_render_resource->_storage_buffer
+            ._global_upload_ringbuffers_end[m_command_info._current_frame_index] =
+            sizeof(MeshPerframeStorageBufferObject);
+
+        (*reinterpret_cast<MeshPerframeStorageBufferObject*>(
+            reinterpret_cast<uintptr_t>(
+                m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer_memory_pointer))) = m_mesh_perframe_storage_buffer_object;
+        // end adding
 
         m_p_vulkan_context->_vkCmdBindPipeline(
             m_command_info._current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _render_pipelines[0].pipeline);

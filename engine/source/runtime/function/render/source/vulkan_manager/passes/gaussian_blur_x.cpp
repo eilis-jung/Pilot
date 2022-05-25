@@ -25,7 +25,7 @@ namespace Pilot
     {
         _descriptor_infos.resize(1);
 
-        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[1] = {};
+        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[2] = {};
 
         VkDescriptorSetLayoutBinding& post_process_global_layout_sampler_binding =
             post_process_global_layout_bindings[0];
@@ -33,6 +33,15 @@ namespace Pilot
         post_process_global_layout_sampler_binding.descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         post_process_global_layout_sampler_binding.descriptorCount = 1;
         post_process_global_layout_sampler_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        //add ubo binding at 1
+        VkDescriptorSetLayoutBinding& post_process_global_layout_storage_buffer_binding =
+            post_process_global_layout_bindings[1];
+        post_process_global_layout_storage_buffer_binding.binding           = 1;
+        post_process_global_layout_storage_buffer_binding.descriptorType    = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        post_process_global_layout_storage_buffer_binding.descriptorCount   = 1;
+        post_process_global_layout_storage_buffer_binding.stageFlags        = VK_SHADER_STAGE_FRAGMENT_BIT;
+        post_process_global_layout_storage_buffer_binding.pImmutableSamplers = NULL;
 
         VkDescriptorSetLayoutCreateInfo post_process_global_layout_create_info;
         post_process_global_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -212,15 +221,25 @@ namespace Pilot
 
     void PGaussianBlurXPass::updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment)
     {
+        // Input brightness image sampler
         VkDescriptorImageInfo scene_image_info = {};
         scene_image_info.sampler =
             PVulkanUtil::getOrCreateLinearSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
         scene_image_info.imageView = brightness_attachment;
         scene_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+        // Input ubo info
+        VkDescriptorBufferInfo mesh_perframe_storage_buffer_info = {};
+        // this offset plus dynamic_offset should not be greater than the size of the buffer
+        mesh_perframe_storage_buffer_info.offset = 0;
+        // the range means the size actually used by the shader per draw call
+        mesh_perframe_storage_buffer_info.range = sizeof(MeshPerframeStorageBufferObject);
+        mesh_perframe_storage_buffer_info.buffer =
+            m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer;
+        assert(mesh_perframe_storage_buffer_info.range <
+               m_p_global_render_resource->_storage_buffer._max_storage_buffer_range);
 
-        VkWriteDescriptorSet post_process_descriptor_writes_info[1];
-
+        VkWriteDescriptorSet post_process_descriptor_writes_info[2];
 
         VkWriteDescriptorSet& post_process_descriptor_sampler_write_info = post_process_descriptor_writes_info[0];
         post_process_descriptor_sampler_write_info.sType                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -232,6 +251,16 @@ namespace Pilot
         post_process_descriptor_sampler_write_info.descriptorCount       = 1;
         post_process_descriptor_sampler_write_info.pImageInfo            = &scene_image_info;
 
+        VkWriteDescriptorSet& mesh_descriptor_writes_info = post_process_descriptor_writes_info[1];
+        mesh_descriptor_writes_info.sType                                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        mesh_descriptor_writes_info.pNext                                 = NULL;
+        mesh_descriptor_writes_info.dstSet                                = _descriptor_infos[0].descriptor_set;
+        mesh_descriptor_writes_info.dstBinding                            = 1;
+        mesh_descriptor_writes_info.dstArrayElement                       = 0;
+        mesh_descriptor_writes_info.descriptorType                        = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        mesh_descriptor_writes_info.descriptorCount                       = 1;
+        mesh_descriptor_writes_info.pBufferInfo                           = &mesh_perframe_storage_buffer_info;
+
 
         vkUpdateDescriptorSets(m_p_vulkan_context->_device,
                                sizeof(post_process_descriptor_writes_info) /
@@ -241,7 +270,8 @@ namespace Pilot
                                NULL);
     }
 
-    void PGaussianBlurXPass::draw()
+    // without dynamic part of storage buffer
+    void PGaussianBlurXPass::draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object)
     {
         
         if (m_render_config._enable_debug_untils_label)
@@ -250,14 +280,32 @@ namespace Pilot
                 VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "Gaussian Blur X", {1.0f, 1.0f, 1.0f, 1.0f}};
             m_p_vulkan_context->_vkCmdBeginDebugUtilsLabelEXT(m_command_info._current_command_buffer, &label_info);
         }
-        
+
+        //add extra info for blur effects
+        VkExtent2D v2 = m_p_vulkan_context->_swapchain_extent;
+        m_mesh_perframe_storage_buffer_object.screen_resolution =
+            glm::vec4(float(m_p_vulkan_context->_swapchain_extent.width), float(m_p_vulkan_context->_swapchain_extent.height), 0.0f, 0.0f); 
+        m_mesh_perframe_storage_buffer_object.editor_screen_resolution = glm::vec4((m_command_info._viewport.x),
+                                                                                   (m_command_info._viewport.y),
+                                                                                   (m_command_info._viewport.width),
+                                                                                   (m_command_info._viewport.height));
+
+        m_p_global_render_resource->_storage_buffer
+            ._global_upload_ringbuffers_end[m_command_info._current_frame_index] =
+            sizeof(MeshPerframeStorageBufferObject);
+
+        (*reinterpret_cast<MeshPerframeStorageBufferObject*>(
+            reinterpret_cast<uintptr_t>(
+                m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer_memory_pointer))) = m_mesh_perframe_storage_buffer_object;
+        // end adding
+
 
         m_p_vulkan_context->_vkCmdBindPipeline(
             m_command_info._current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _render_pipelines[0].pipeline);
 
         m_p_vulkan_context->_vkCmdSetViewport(m_command_info._current_command_buffer, 0, 1, &m_command_info._viewport);
         m_p_vulkan_context->_vkCmdSetScissor(m_command_info._current_command_buffer, 0, 1, &m_command_info._scissor);
-        
+
         m_p_vulkan_context->_vkCmdBindDescriptorSets(m_command_info._current_command_buffer,
                                                      VK_PIPELINE_BIND_POINT_GRAPHICS,
                                                      _render_pipelines[0].layout,
@@ -265,8 +313,7 @@ namespace Pilot
                                                      1,
                                                      &_descriptor_infos[0].descriptor_set,
                                                      0,
-                                                     NULL);
-        
+                                                     NULL); 
 
         vkCmdDraw(m_command_info._current_command_buffer, 3, 1, 0, 0);
 
@@ -276,5 +323,72 @@ namespace Pilot
         }
         
     }
+    
+    // with dynamic part of storage buffer
+    // void PGaussianBlurXPass::draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object)
+    // {
+        
+    //     if (m_render_config._enable_debug_untils_label)
+    //     {
+    //         VkDebugUtilsLabelEXT label_info = {
+    //             VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, NULL, "Gaussian Blur X", {1.0f, 1.0f, 1.0f, 1.0f}};
+    //         m_p_vulkan_context->_vkCmdBeginDebugUtilsLabelEXT(m_command_info._current_command_buffer, &label_info);
+    //     }
+
+    //     //add extra info for blur effects
+    //     VkExtent2D v2 = m_p_vulkan_context->_swapchain_extent;
+    //     m_mesh_perframe_storage_buffer_object.screen_resolution =
+    //         glm::vec4(float(m_p_vulkan_context->_swapchain_extent.width), float(m_p_vulkan_context->_swapchain_extent.height), 0.0f, 0.0f); 
+    //     m_mesh_perframe_storage_buffer_object.editor_screen_resolution = glm::vec4((m_command_info._viewport.x),
+    //                                                                                (m_command_info._viewport.y),
+    //                                                                                (m_command_info._viewport.width),
+    //                                                                                (m_command_info._viewport.height));
+
+    //     uint32_t perframe_dynamic_offset =
+    //         roundUp(m_p_global_render_resource->_storage_buffer
+    //                     ._global_upload_ringbuffers_end[m_command_info._current_frame_index],
+    //                 m_p_global_render_resource->_storage_buffer._min_storage_buffer_offset_alignment);
+
+
+    //     m_p_global_render_resource->_storage_buffer
+    //         ._global_upload_ringbuffers_end[m_command_info._current_frame_index] =
+    //         perframe_dynamic_offset + sizeof(MeshPerframeStorageBufferObject);
+
+
+    //     (*reinterpret_cast<MeshPerframeStorageBufferObject*>(
+    //         reinterpret_cast<uintptr_t>(
+    //             m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer_memory_pointer) + perframe_dynamic_offset)) = m_mesh_perframe_storage_buffer_object;
+
+    //     uint32_t dynamic_offsets[1] = {perframe_dynamic_offset};
+
+    //     // end adding
+
+
+    //     m_p_vulkan_context->_vkCmdBindPipeline(
+    //         m_command_info._current_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _render_pipelines[0].pipeline);
+
+    //     m_p_vulkan_context->_vkCmdSetViewport(m_command_info._current_command_buffer, 0, 1, &m_command_info._viewport);
+    //     m_p_vulkan_context->_vkCmdSetScissor(m_command_info._current_command_buffer, 0, 1, &m_command_info._scissor);
+
+    //     // add dynamic data
+        
+    //     m_p_vulkan_context->_vkCmdBindDescriptorSets(m_command_info._current_command_buffer,
+    //                                                  VK_PIPELINE_BIND_POINT_GRAPHICS,
+    //                                                  _render_pipelines[0].layout,
+    //                                                  0,
+    //                                                  1,
+    //                                                  &_descriptor_infos[0].descriptor_set,
+    //                                                  (sizeof(dynamic_offsets) / sizeof(dynamic_offsets[0])),
+    //                                                  dynamic_offsets);  
+        
+
+    //     vkCmdDraw(m_command_info._current_command_buffer, 3, 1, 0, 0);
+
+    //     if (m_render_config._enable_debug_untils_label)
+    //     {
+    //         m_p_vulkan_context->_vkCmdEndDebugUtilsLabelEXT(m_command_info._current_command_buffer);
+    //     }
+        
+    // }
 
 } // namespace Pilot
