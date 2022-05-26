@@ -176,7 +176,9 @@ Vertex shader: `engine/shader/glsl/gaussian_blur_x.vert`
 
 Fragment shader: `engine/shader/glsl/gaussian_blur_x.frag`
 
-This subpass takes 
+This subpass samples from the output of brightness_filter, `_main_camera_pass_brightness_buffer`, and filters the sample with a 1D Gaussian kernel. For correct sampling, this subpass needs UV of each pixel in the scene.
+
+The vertex shader generates UV of each pixel in full-screen coordinates, then the fragment shader translates the UV into viewport coordinates. This translation happens
 
 
 
