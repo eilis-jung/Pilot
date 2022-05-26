@@ -12,20 +12,20 @@
 
 namespace Pilot
 {
-    void PGaussianBlurYPass::initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment)
+    void PGaussianBlurYPass::initialize(VkRenderPass render_pass, VkImageView brightness_attachment)
     {
         _framebuffer.render_pass = render_pass;
         setupDescriptorSetLayout();
         setupPipelines();
         setupDescriptorSet();
-        updateAfterFramebufferRecreate(input_attachment, brightness_attachment);
+        updateAfterFramebufferRecreate(brightness_attachment);
     }
 
     void PGaussianBlurYPass::setupDescriptorSetLayout()
     {
         _descriptor_infos.resize(1);
 
-        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[3] = {};
+        VkDescriptorSetLayoutBinding post_process_global_layout_bindings[2] = {};
 
         VkDescriptorSetLayoutBinding& post_process_global_layout_sampler_binding =
             post_process_global_layout_bindings[0];
@@ -42,14 +42,6 @@ namespace Pilot
         post_process_global_layout_storage_buffer_binding.descriptorCount   = 1;
         post_process_global_layout_storage_buffer_binding.stageFlags        = VK_SHADER_STAGE_FRAGMENT_BIT;
         post_process_global_layout_storage_buffer_binding.pImmutableSamplers = NULL;
-
-        VkDescriptorSetLayoutBinding& post_process_global_layout_input_attachment_binding =
-            post_process_global_layout_bindings[2];
-        post_process_global_layout_input_attachment_binding.binding         = 2;
-        post_process_global_layout_input_attachment_binding.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_global_layout_input_attachment_binding.descriptorCount = 1;
-        post_process_global_layout_input_attachment_binding.stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT;
-
 
 
         VkDescriptorSetLayoutCreateInfo post_process_global_layout_create_info;
@@ -146,9 +138,9 @@ namespace Pilot
         VkPipelineColorBlendAttachmentState color_blend_attachment_state {};
         color_blend_attachment_state.colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        color_blend_attachment_state.blendEnable         = VK_FALSE;
+        color_blend_attachment_state.blendEnable         = VK_TRUE;
         color_blend_attachment_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        color_blend_attachment_state.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+        color_blend_attachment_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
         color_blend_attachment_state.colorBlendOp        = VK_BLEND_OP_ADD;
         color_blend_attachment_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         color_blend_attachment_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -228,7 +220,7 @@ namespace Pilot
         }
     }
 
-    void PGaussianBlurYPass::updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment)
+    void PGaussianBlurYPass::updateAfterFramebufferRecreate(VkImageView brightness_attachment)
     {
 
         VkDescriptorImageInfo scene_image_info = {};
@@ -248,13 +240,8 @@ namespace Pilot
         assert(mesh_perframe_storage_buffer_info.range <
                m_p_global_render_resource->_storage_buffer._max_storage_buffer_range);
 
-        VkDescriptorImageInfo post_process_per_frame_input_attachment_info = {};
-        post_process_per_frame_input_attachment_info.sampler =
-            PVulkanUtil::getOrCreateNearestSampler(m_p_vulkan_context->_physical_device, m_p_vulkan_context->_device);
-        post_process_per_frame_input_attachment_info.imageView   = input_attachment;
-        post_process_per_frame_input_attachment_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        VkWriteDescriptorSet post_process_descriptor_writes_info[3];
+        VkWriteDescriptorSet post_process_descriptor_writes_info[2];
 
         VkWriteDescriptorSet& post_process_descriptor_sampler_write_info = post_process_descriptor_writes_info[0];
         post_process_descriptor_sampler_write_info.sType                 = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -275,18 +262,6 @@ namespace Pilot
         mesh_descriptor_writes_info.descriptorType                        = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         mesh_descriptor_writes_info.descriptorCount                       = 1;
         mesh_descriptor_writes_info.pBufferInfo                           = &mesh_perframe_storage_buffer_info;
-
-        VkWriteDescriptorSet& post_process_descriptor_input_attachment_write_info =
-            post_process_descriptor_writes_info[2];
-        post_process_descriptor_input_attachment_write_info.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        post_process_descriptor_input_attachment_write_info.pNext           = NULL;
-        post_process_descriptor_input_attachment_write_info.dstSet          = _descriptor_infos[0].descriptor_set;
-        post_process_descriptor_input_attachment_write_info.dstBinding      = 2;
-        post_process_descriptor_input_attachment_write_info.dstArrayElement = 0;
-        post_process_descriptor_input_attachment_write_info.descriptorType  = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        post_process_descriptor_input_attachment_write_info.descriptorCount = 1;
-        post_process_descriptor_input_attachment_write_info.pImageInfo = &post_process_per_frame_input_attachment_info;
-
 
         vkUpdateDescriptorSets(m_p_vulkan_context->_device,
                                sizeof(post_process_descriptor_writes_info) /

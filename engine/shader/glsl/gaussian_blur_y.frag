@@ -4,7 +4,7 @@
 
 #include "constants.h"
 
-layout(input_attachment_index = 0, set = 0, binding = 2) uniform highp subpassInput in_color;
+// layout(input_attachment_index = 0, set = 0, binding = 2) uniform highp subpassInput in_color;
 
 layout(set = 0, binding = 0) uniform sampler2D scene_sampler;
 
@@ -51,7 +51,7 @@ highp vec2 get_viewport_uv(highp vec2 full_screen_uv);
 
 void main()
 {
-    highp vec4 color = subpassLoad(in_color).rgba;
+    // highp vec4 color = subpassLoad(in_color).rgba;
     // out_color = color;
 
     highp float weight[5];
@@ -79,7 +79,7 @@ void main()
         result += texture(scene_sampler, sample_uv + vec2(0.0, tex_offset.x * float(i))).rgb * weight[i] * intensity;
         result += texture(scene_sampler, sample_uv - vec2(0.0, tex_offset.x * float(i))).rgb * weight[i] * intensity;
 	}
-	out_color = vec4(result, 1.0) + color;
+	out_color = vec4(result, 1.0);
 }
 
 highp vec2 get_viewport_uv(highp vec2 full_screen_uv)

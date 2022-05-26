@@ -35,22 +35,9 @@ bool Pilot::PVulkanManager::initializeRenderPass()
 
     m_brightness_filter_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd]);
 
-
-    // PGaussianBlurXHelperInfo gaussian_blur_x_pass_helper_info {};
-    // gaussian_blur_x_pass_helper_info.point_light_shadow_color_image_view = m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_brightness_buffer];
-    // light_pass_helper_info.directional_light_shadow_color_image_view =
-    //     m_directional_light_shadow_pass._framebuffer.attachments[0].view;
-    // m_main_camera_pass.setHelperInfo(light_pass_helper_info);
-    // m_main_camera_pass.initialize();
-
-
-
-
     m_gaussian_blur_x_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd], m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_brightness_buffer]);
 
-    m_gaussian_blur_y_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_odd], m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
-
-    m_copy_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_brightness_buffer]);
+    m_gaussian_blur_y_pass.initialize(m_main_camera_pass.getRenderPass(), m_main_camera_pass.getFramebufferImageViews()[_main_camera_pass_backup_buffer_even]);
 
     m_ui_pass.initialize(m_main_camera_pass.getRenderPass());
 
