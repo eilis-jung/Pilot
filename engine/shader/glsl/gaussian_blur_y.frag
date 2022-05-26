@@ -51,9 +51,6 @@ highp vec2 get_viewport_uv(highp vec2 full_screen_uv);
 
 void main()
 {
-    // highp vec4 color = subpassLoad(in_color).rgba;
-    // out_color = color;
-
     highp float weight[5];
 	weight[0] = 0.227027;
 	weight[1] = 0.1945946;
@@ -71,15 +68,15 @@ void main()
 
     highp vec2 tex_offset = vec2(tox, toy);
     highp vec4 sampled_color = texture(scene_sampler, sample_uv).rgba;
-    
-	highp vec3 result = texture(scene_sampler, sample_uv).rgb * weight[0];
 
-	for(int i = 1; i < 5; ++i)
-	{
+    highp vec3 result = texture(scene_sampler, sample_uv).rgb * weight[0];
+    for(int i = 1; i < 5; ++i)
+    {
         result += texture(scene_sampler, sample_uv + vec2(0.0, tex_offset.x * float(i))).rgb * weight[i] * intensity;
         result += texture(scene_sampler, sample_uv - vec2(0.0, tex_offset.x * float(i))).rgb * weight[i] * intensity;
-	}
-	out_color = vec4(result, 1.0);
+    }
+    out_color = vec4(result, 1.0);
+
 }
 
 highp vec2 get_viewport_uv(highp vec2 full_screen_uv)

@@ -54,10 +54,10 @@ namespace Pilot
     class PGaussianBlurXPass : public PRenderPassBase
     {
     public:
-        void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment);
-        void draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void draw();
 
-        void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment);
+        void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
 
     private:
         void setupDescriptorSetLayout();
@@ -68,10 +68,10 @@ namespace Pilot
     class PGaussianBlurYPass : public PRenderPassBase
     {
     public:
-        void initialize(VkRenderPass render_pass, VkImageView brightness_attachment);
-        void draw(MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void initialize(VkRenderPass render_pass, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void draw();
 
-        void updateAfterFramebufferRecreate(VkImageView brightness_attachment);
+        void updateAfterFramebufferRecreate(VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
 
     private:
         void setupDescriptorSetLayout();

@@ -12,6 +12,7 @@ layout(location = 0) out highp vec4 out_color;
 void main()
 {
     highp vec4 color       = subpassLoad(in_color).rgba;
+    // out_color = color;
 
     highp float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     if(brightness > 0.9) {

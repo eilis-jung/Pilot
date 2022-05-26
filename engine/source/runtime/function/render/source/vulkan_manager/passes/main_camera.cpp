@@ -301,10 +301,6 @@ namespace Pilot
             &backup_even_color_attachment_description - attachments;
         gaussian_blur_y_pass_input_attachment_reference[0].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        // gaussian_blur_y_pass_input_attachment_reference[1].attachment =
-        //     &backup_odd_color_attachment_description - attachments;
-        // gaussian_blur_y_pass_input_attachment_reference[1].layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
         VkAttachmentReference gaussian_blur_y_pass_color_attachment_reference {};
         gaussian_blur_y_pass_color_attachment_reference.attachment =
             &backup_odd_color_attachment_description - attachments;
@@ -404,7 +400,6 @@ namespace Pilot
         combine_ui_pass.pPreserveAttachments    = NULL;
 
         VkSubpassDependency dependencies[10] = {};
-
 
         VkSubpassDependency& deferred_lighting_pass_depend_on_shadow_map_pass = dependencies[0];
         deferred_lighting_pass_depend_on_shadow_map_pass.srcSubpass           = VK_SUBPASS_EXTERNAL;
@@ -2270,11 +2265,11 @@ namespace Pilot
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_x_pass.draw(m_mesh_perframe_storage_buffer_object);
+        gaussian_blur_x_pass.draw();
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_y_pass.draw(m_mesh_perframe_storage_buffer_object);
+        gaussian_blur_y_pass.draw();
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -2378,11 +2373,11 @@ namespace Pilot
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_x_pass.draw(m_mesh_perframe_storage_buffer_object);
+        gaussian_blur_x_pass.draw();
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        gaussian_blur_y_pass.draw(m_mesh_perframe_storage_buffer_object);
+        gaussian_blur_y_pass.draw();
 
         m_p_vulkan_context->_vkCmdNextSubpass(m_command_info._current_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 
