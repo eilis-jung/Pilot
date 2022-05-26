@@ -77,6 +77,8 @@ void main()
 
     out_color = vec4(result, 1.0);
 
+    // out_color = sampled_color;  // For debugging
+
 }
 
 highp vec2 get_viewport_uv(highp vec2 full_screen_uv)

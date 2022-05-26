@@ -76,6 +76,7 @@ void main()
         result += texture(scene_sampler, sample_uv - vec2(0.0, tex_offset.x * float(i))).rgb * weight[i] * intensity;
     }
     out_color = vec4(result, 1.0);
+    // out_color = sampled_color;  // For debugging
 
 }
 

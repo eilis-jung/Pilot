@@ -142,3 +142,72 @@ void main()
     out_color = result;
 }
 ```
+
+## Task 3
+
+### Implementation
+
+I chose to implement Blooming effect based on [Bloom - LearnOpenGL](https://learnopengl.com/Advanced-Lighting/Bloom). The general process is listed below:
+
+1. Get pixels with high brightness
+2. Use a 1D Gaussian kernel to blur the highlighted pixels in x-direction
+3. Use a 1D Gaussian kernel to blur the highlighted pixels in y-direction, then output to the next subpass
+
+For the 3 steps I divided them into 3 subpasses. Usually the 2nd and 3rd subpasses could have been merged into one, but since I'm still new to Vulkan, I separated them.
+
+**Step 1**
+
+Corresponding code: `engine/source/runtime/function/render/source/vulkan_manager/passes/brightness_filter.cpp`
+
+Fragment shader: `engine/shader/glsl/brightness_filter.frag`
+
+Following `color_grading.cpp`, I created a new subpass in `brightness_filter.cpp`. This new subpass takes `attachments[_main_camera_pass_backup_buffer_odd]` as input, and outputs to another buffer, `_main_camera_pass_brightness_buffer`, that I created in advance. 
+
+Since tone mapping should take place after bloom effect, I put this subpass before tone mapping, and added dependencies in `main_camera.cpp`. Afterwards, I added this subpass into `PMainCameraPass::draw(...)` and `PVulkanManager::recreateSwapChain(...)` etc.
+
+The fragment shader is only filtering the bright pixels with a high-pass filter. I also tried to "soften" the edge pf glowing parts a bit by linearly interpolating around the threshold.
+
+
+**Step 2**
+
+Correponding code: `engine/source/runtime/function/render/source/vulkan_manager/passes/gaussian_blur_x.cpp`
+
+Vertex shader: `engine/shader/glsl/gaussian_blur_x.vert`
+
+Fragment shader: `engine/shader/glsl/gaussian_blur_x.frag`
+
+This subpass takes 
+
+
+
+
+**Code fragments of brightness_filter.frag**
+
+```Cpp
+...
+...
+void main()
+{
+    highp vec4 color       = subpassLoad(in_color).rgba;
+
+    highp float brightness = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+    if(brightness > 0.4) {  // here this limit should be smaller than `minVal` in soften(...)
+        out_color = vec4(color.rgb * soften(brightness), 1.0);
+    } else {
+        out_color = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    // out_color = color; // For debugging
+}
+
+// A "softer" blending of glow & darkness but failed
+highp float soften(highp float br) {
+    highp float minVal = 0.8;
+    highp float maxVal = 0.95;
+    if (br >= maxVal)
+        return br;
+    if (br <= minVal)
+        return 0.0;
+    return (br-minVal)*(maxVal/(maxVal - minVal));
+}
+```
