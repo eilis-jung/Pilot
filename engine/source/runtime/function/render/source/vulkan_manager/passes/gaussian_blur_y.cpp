@@ -12,13 +12,13 @@
 
 namespace Pilot
 {
-    void PGaussianBlurYPass::initialize(VkRenderPass render_pass, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object)
+    void PGaussianBlurYPass::initialize(VkRenderPass render_pass, VkImageView brightness_attachment)
     {
         _framebuffer.render_pass = render_pass;
         setupDescriptorSetLayout();
         setupPipelines();
         setupDescriptorSet();
-        updateAfterFramebufferRecreate(brightness_attachment, m_mesh_perframe_storage_buffer_object);
+        updateAfterFramebufferRecreate(brightness_attachment);
     }
 
     void PGaussianBlurYPass::setupDescriptorSetLayout()
@@ -220,7 +220,7 @@ namespace Pilot
         }
     }
 
-    void PGaussianBlurYPass::updateAfterFramebufferRecreate(VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object)
+    void PGaussianBlurYPass::updateAfterFramebufferRecreate(VkImageView brightness_attachment)
     {
 
         VkDescriptorImageInfo scene_image_info = {};
@@ -237,25 +237,6 @@ namespace Pilot
             m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer;
         assert(mesh_perframe_storage_buffer_info.range <
                m_p_global_render_resource->_storage_buffer._max_storage_buffer_range);
-        
-
-        //add extra info for blur effects
-        VkExtent2D v2 = m_p_vulkan_context->_swapchain_extent;
-        m_mesh_perframe_storage_buffer_object.screen_resolution =
-            glm::vec4(float(m_p_vulkan_context->_swapchain_extent.width), float(m_p_vulkan_context->_swapchain_extent.height), 0.0f, 0.0f); 
-        m_mesh_perframe_storage_buffer_object.editor_screen_resolution = glm::vec4((m_command_info._viewport.x),
-                                                                                   (m_command_info._viewport.y),
-                                                                                   (m_command_info._viewport.width),
-                                                                                   (m_command_info._viewport.height));
-
-        m_p_global_render_resource->_storage_buffer
-            ._global_upload_ringbuffers_end[m_command_info._current_frame_index] =
-            sizeof(MeshPerframeStorageBufferObject);
-
-        (*reinterpret_cast<MeshPerframeStorageBufferObject*>(
-            reinterpret_cast<uintptr_t>(
-                m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer_memory_pointer))) = m_mesh_perframe_storage_buffer_object;
-        // end adding
 
 
         VkWriteDescriptorSet post_process_descriptor_writes_info[2];

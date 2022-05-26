@@ -25,6 +25,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
+
 namespace Pilot
 {
     std::vector<std::pair<std::string, bool>> g_editor_node_state_array;
@@ -701,10 +702,12 @@ namespace Pilot
 
         Vector2 new_window_pos  = {0.0f, 0.0f};
         Vector2 new_window_size = {0.0f, 0.0f};
+
         new_window_pos.x        = ImGui::GetWindowPos().x;
         new_window_pos.y        = ImGui::GetWindowPos().y + menu_bar_rect.Min.y;
         new_window_size.x       = ImGui::GetWindowSize().x;
         new_window_size.y       = ImGui::GetWindowSize().y - menu_bar_rect.Min.y;
+
 
         // if (new_window_pos != m_engine_window_pos || new_window_size != m_engine_window_size)
         {

@@ -58,7 +58,7 @@ void main()
 
     highp vec2 sample_uv = get_viewport_uv(in_texcoord.xy);
 
-    highp float intensity = 1.5;
+    highp float intensity = 0.5;
     highp float range = 1.0;
 
     highp float tox = 1.0 / float(textureSize(scene_sampler, 0).x) * range;

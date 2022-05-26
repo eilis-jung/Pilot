@@ -54,10 +54,10 @@ namespace Pilot
     class PGaussianBlurXPass : public PRenderPassBase
     {
     public:
-        void initialize(VkRenderPass render_pass, VkImageView input_attachment, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void initialize(VkRenderPass render_pass, VkImageView brightness_attachment);
         void draw();
 
-        void updateAfterFramebufferRecreate(VkImageView input_attachment, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void updateAfterFramebufferRecreate(VkImageView brightness_attachment);
 
     private:
         void setupDescriptorSetLayout();
@@ -68,10 +68,10 @@ namespace Pilot
     class PGaussianBlurYPass : public PRenderPassBase
     {
     public:
-        void initialize(VkRenderPass render_pass, VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void initialize(VkRenderPass render_pass, VkImageView brightness_attachment);
         void draw();
 
-        void updateAfterFramebufferRecreate(VkImageView brightness_attachment, MeshPerframeStorageBufferObject& m_mesh_perframe_storage_buffer_object);
+        void updateAfterFramebufferRecreate(VkImageView brightness_attachment);
 
     private:
         void setupDescriptorSetLayout();
@@ -246,6 +246,8 @@ namespace Pilot
         void drawSkybox();
         void drawBillboardParticle();
         void drawAxis();
+
+        void updateSharedStorageBuffer(); //add extra info into shared storage buffer for blur effects
 
     private:
         VkImageView                m_point_light_shadow_color_image_view;

@@ -7,7 +7,6 @@
 #include <brightness_filter_frag.h>
 #include <post_process_vert.h>
 
-#include <iostream>
 
 namespace Pilot
 {

@@ -6,6 +6,7 @@
 
 #include <map>
 #include <stdexcept>
+#include <iostream>
 
 #include <axis_frag.h>
 #include <axis_vert.h>
@@ -31,6 +32,7 @@ namespace Pilot
         setupDescriptorSet();
         setupFramebufferDescriptorSet();
         setupSwapchainFramebuffers();
+        // updateAfterFramebufferRecreate();
     }
 
     void PMainCameraPass::setHelperInfo(const PLightPassHelperInfo& helper_info)
@@ -2177,6 +2179,26 @@ namespace Pilot
         setupFramebufferDescriptorSet();
 
         setupSwapchainFramebuffers();
+
+        // updateSharedStorageBuffer();
+    }
+
+    void PMainCameraPass::updateSharedStorageBuffer() {
+        VkExtent2D v2 = m_p_vulkan_context->_swapchain_extent;
+        m_mesh_perframe_storage_buffer_object.screen_resolution =
+            glm::vec4(float(m_p_vulkan_context->_swapchain_extent.width), float(m_p_vulkan_context->_swapchain_extent.height), 0.0f, 0.0f); 
+        m_mesh_perframe_storage_buffer_object.editor_screen_resolution = glm::vec4((m_command_info._viewport.x),
+                                                                                   (m_command_info._viewport.y),
+                                                                                   (m_command_info._viewport.width),
+                                                                                   (m_command_info._viewport.height));
+
+        m_p_global_render_resource->_storage_buffer
+            ._global_upload_ringbuffers_end[m_command_info._current_frame_index] =
+            sizeof(MeshPerframeStorageBufferObject);
+
+        (*reinterpret_cast<MeshPerframeStorageBufferObject*>(
+            reinterpret_cast<uintptr_t>(
+                m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer_memory_pointer))) = m_mesh_perframe_storage_buffer_object;
     }
 
     void PMainCameraPass::draw(PColorGradingPass& color_grading_pass,
@@ -2211,6 +2233,7 @@ namespace Pilot
 
             m_p_vulkan_context->_vkCmdBeginRenderPass(
                 m_command_info._current_command_buffer, &renderpass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+            
         }
 
         if (m_render_config._enable_debug_untils_label)
@@ -2221,6 +2244,7 @@ namespace Pilot
         }
 
         drawMeshGbuffer();
+
 
         if (m_render_config._enable_debug_untils_label)
         {
@@ -2253,6 +2277,9 @@ namespace Pilot
         }
 
         drawBillboardParticle();
+
+        updateSharedStorageBuffer();
+
 
         if (m_render_config._enable_debug_untils_label)
         {
@@ -2311,6 +2338,8 @@ namespace Pilot
         combine_ui_pass.draw();
 
         m_p_vulkan_context->_vkCmdEndRenderPass(m_command_info._current_command_buffer);
+        
+        
     }
 
     void PMainCameraPass::drawForward(PColorGradingPass& color_grading_pass,
