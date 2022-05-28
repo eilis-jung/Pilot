@@ -1,6 +1,6 @@
-# Homework 2 - Jung
+# Homework 2
 
-For full code, see the end of this report.
+For full code, see the end of each task section.
 
 ## Task 1
 
@@ -36,8 +36,6 @@ At first I misunderstood the interpolation. I thought it was simply a weighted a
 
 Corresponding code : `color_grading.frag`, line 76.
 
-
-
 ### Task 1 - Result
 
 Without color-grading:
@@ -48,18 +46,8 @@ With color-grading (color_grading_lut_05.png):
 
 ![Without color-grading (color_grading_lut_05.png)](report/../after_lut_05.png "With color-grading(color_grading_lut_05.png)")
 
-## Task 2
 
-### Implementation
-
-I found a free LUT (in .cube) online and adjusted it a bit to make the coloring stronger. It gives strong saturation in blue and orange, producing an "early-morning" vibe. Then I exported a 256x16 png with it.
-
-### Task 2 - Result
-
-With customized color-grading (color_grading_lut_05.png):
-
-![Without color-grading (customized_lut.png)](report/../after_customized_lut.png "With color-grading(customized_lut.png)")
-
+### Task 1 - Code
 
 **Full Code of color_grading.frag**
 
@@ -143,6 +131,21 @@ void main()
 }
 ```
 
+
+
+## Task 2
+
+### Implementation
+
+I found a free LUT (in .cube) online and adjusted it a bit to make the coloring stronger. It gives strong saturation in blue and orange, producing an "early-morning" vibe. Then I exported a 256x16 png with it.
+
+### Task 2 - Result
+
+With customized color-grading (color_grading_lut_05.png):
+
+![With color-grading (customized_lut.png)](report/../after_customized_lut.png "With color-grading(customized_lut.png)")
+
+
 ## Task 3
 
 ### Implementation
@@ -176,12 +179,60 @@ Vertex shader: `engine/shader/glsl/gaussian_blur_x.vert`
 
 Fragment shader: `engine/shader/glsl/gaussian_blur_x.frag`
 
-This subpass samples from the output of brightness_filter, `_main_camera_pass_brightness_buffer`, and filters the sample with a 1D Gaussian kernel. For correct sampling, this subpass needs UV of each pixel in the scene.
+This subpass samples from the output of brightness_filter, `f`, and filters the sample with a 1D Gaussian kernel. For correct sampling, this subpass needs UV of each pixel in the scene.
 
-The vertex shader generates UV of each pixel in full-screen coordinates, then the fragment shader translates the UV into viewport coordinates. This translation happens
+The vertex shader generates UV of each pixel in full-screen coordinates, then the fragment shader translates the UV into viewport coordinates (without editor UI). This translation happens within the fragment shader. To pass the transformation into shader, a storage buffer is needed. Here I used the built-in `m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer` so that it doesn't need to be initialized again.
+
+The buffer is supposed to be updated when viewport dimensions change. Typically it happens during `updateAfterFramebufferRecreate(...)` of each render pass. During experiments, I found that the editor UI dimensions are not updated before UIPass draws, i.e. viewport coordinates cannot be caught in the very first rendering process. Also, the engine has a bug of not updating editor UI dimensions properly when maximizing/minimizing the UI window.
+
+After trying to fix the forementioned bugs but failed (didn't want to change the pipeline too much), I decided to put the storage buffer updates in `PMainCameraPass::draw(...)`, i.e. updating the dimensions in every frame. This slows down the performance hugely and brings a lot of rendering artifacts (flickering due to I/O). Till now I haven't found a better and easier way to solve this issue.
+
+After passing the storage buffer into fragment shader, I passed a sampler using the result of previous pass, `_main_camera_pass_brightness_buffer`, as the texture to be sampled. Then I implemented a 1D Gaussian kernel with the sampled RGB values, to blur the image on x-direction.
+
+
+**Step 3**
+
+Correponding code: `engine/source/runtime/function/render/source/vulkan_manager/passes/gaussian_blur_y.cpp`
+
+Vertex shader: `engine/shader/glsl/gaussian_blur_x.vert` (yes, it's the same as previous)
+
+Fragment shader: `engine/shader/glsl/gaussian_blur_y.frag`
+
+This subpass samples from the output of `gaussian_blur_x`, blur it in y-direction, then blend it with original scene, then output to another buffer . Compared to `gaussian_blur_x`, the biggest is color blending. Here I write the result into `attachments[_main_camera_pass_backup_buffer_odd]` with `VK_BLEND_OP_ADD`.
 
 
 
+### Task 3 - Result
+
+The initial scene in the engine is outdoors with daylight, making it harder to observe the bloom effects. Still, it's obvious that the highlights (clouds, wall edges) in the scene are slightly glowing.
+
+With blooming filter:
+
+![With color-grading (customized_lut.png)](report/../with_bloom_lut.png "With color-grading(customized_lut.png)")
+
+Without blooming filter:
+
+![With color-grading (customized_lut.png)](report/../after_customized_lut.png "With color-grading(customized_lut.png)")
+
+### Task 3 - Discussion
+
+The general concept of bloom filter is simple, but the implementation using Pilot has been challenging. Here are a few thoughts that might make the performance smoother & better:
+
+- An anti-aliasing pass will make the glowing parts more continuous at edges, e.g.,
+  
+  ![Fragmented](report/../fragmented.png "Fragmented")
+
+   since the local brightness will have a smoother distribution. This can prevent the current glows from being fragmented.
+
+- There are some flickering artifacts, especially on the character's body, e.g. on the character's head:
+
+  ![Flickering](report/../flickering.png "Flickering")
+
+  I tried to eliminate it but failed. I suspect this artifact comes from sampling, but not sure what's the exact cause.
+
+- Initialization of engine can be optimized by adding an inital viewport width/height. Then all the render passes which needs this information during rendering won't have to update their UBO every frame.
+
+### Task 3 - Some Code
 
 **Code fragments of brightness_filter.frag**
 
@@ -198,8 +249,6 @@ void main()
     } else {
         out_color = vec4(0.0, 0.0, 0.0, 1.0);
     }
-
-    // out_color = color; // For debugging
 }
 
 // A "softer" blending of glow & darkness but failed
@@ -211,5 +260,55 @@ highp float soften(highp float br) {
     if (br <= minVal)
         return 0.0;
     return (br-minVal)*(maxVal/(maxVal - minVal));
+}
+```
+
+
+**Code fragments of gaussian_blur_x.frag**
+
+```Cpp
+...
+...
+highp vec2 get_viewport_uv(highp vec2 full_screen_uv);
+
+void main()
+{
+    highp float weight[5];
+	weight[0] = 0.227027;
+	weight[1] = 0.1945946;
+	weight[2] = 0.1216216;
+	weight[3] = 0.054054;
+	weight[4] = 0.016216;
+
+    highp vec2 sample_uv = get_viewport_uv(in_texcoord.xy);
+
+    highp float intensity = 0.5;
+    highp float range = 1.0;
+
+    highp float tox = 1.0 / float(textureSize(scene_sampler, 0).x) * range;
+    highp float toy = 1.0 / float(textureSize(scene_sampler, 0).y) * range;
+
+    highp vec2 tex_offset = vec2(tox, toy);
+    highp vec4 sampled_color = texture(scene_sampler, sample_uv).rgba;
+
+    highp vec3 result = texture(scene_sampler, sample_uv).rgb * weight[0];
+
+    for(int i = 1; i < 5; ++i)
+    {
+        result += texture(scene_sampler, sample_uv + vec2(tex_offset.x * float(i), 0.0)).rgb * weight[i] * intensity;
+        result += texture(scene_sampler, sample_uv - vec2(tex_offset.x * float(i), 0.0)).rgb * weight[i] * intensity;
+    }
+
+    out_color = vec4(result, 1.0);
+
+}
+
+highp vec2 get_viewport_uv(highp vec2 full_screen_uv)
+{
+    highp vec2 editor_ratio = editor_screen_resolution.zw / screen_resolution.xy;
+    highp vec2 offset = editor_screen_resolution.xy / screen_resolution.xy;
+    highp vec2 viewport_uv = full_screen_uv.xy * editor_ratio + offset;
+    
+    return viewport_uv;
 }
 ```

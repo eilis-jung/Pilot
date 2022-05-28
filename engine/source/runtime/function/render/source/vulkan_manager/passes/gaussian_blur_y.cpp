@@ -229,7 +229,7 @@ namespace Pilot
         scene_image_info.imageView = brightness_attachment;
         scene_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        // Input ubo info
+        // Input ubo
         VkDescriptorBufferInfo mesh_perframe_storage_buffer_info = {};
         mesh_perframe_storage_buffer_info.offset = 0;
         mesh_perframe_storage_buffer_info.range = sizeof(MeshPerframeStorageBufferObject);

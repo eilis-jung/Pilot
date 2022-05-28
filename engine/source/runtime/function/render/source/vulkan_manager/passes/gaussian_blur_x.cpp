@@ -225,11 +225,9 @@ namespace Pilot
         scene_image_info.imageView = brightness_attachment;
         scene_image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-        // Input ubo info
+        // Input ubo
         VkDescriptorBufferInfo mesh_perframe_storage_buffer_info = {};
-        // this offset plus dynamic_offset should not be greater than the size of the buffer
         mesh_perframe_storage_buffer_info.offset = 0;
-        // the range means the size actually used by the shader per draw call
         mesh_perframe_storage_buffer_info.range = sizeof(MeshPerframeStorageBufferObject);
         mesh_perframe_storage_buffer_info.buffer =
             m_p_global_render_resource->_storage_buffer._global_upload_ringbuffer;
