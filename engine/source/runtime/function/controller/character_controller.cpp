@@ -85,14 +85,17 @@ namespace Pilot
             hits))
         {
             // Move to opposite direction if hit
-            Vector3 opposite_direction = Vector3(0, 0, 0);
+            // Hit normal is in the same direction as horizontal_direction
+            Vector3 opposite_direction = Vector3();
             
-            for (auto hit : hits)
+            for (auto & hit : hits)
             {
                 opposite_direction += hit.hit_normal;
             }
+            opposite_direction.z = 0;
             opposite_direction.normalise();
             horizontal_direction -= opposite_direction;
+            // No need to normalize horizontal_direction, since it will hugely increase displacement
             final_position += horizontal_displacement.length() * horizontal_direction;
         }
         else
