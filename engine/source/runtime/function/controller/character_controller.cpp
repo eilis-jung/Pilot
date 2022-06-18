@@ -77,16 +77,25 @@ namespace Pilot
         hits.clear();
 
         // side pass
-        //if (physics_scene->sweep(
-        //    m_rigidbody_shape,
-        //    /**** [0] ****/,
-        //    /**** [1] ****/,
-        //    /**** [2] ****/,
-        //    hits))
-        //{
-        //    final_position += /**** [3] ****/;
-        //}
-        //else
+        if (physics_scene->sweep(
+            m_rigidbody_shape,
+            world_transform.getMatrix(),
+            horizontal_direction,
+            horizontal_displacement.length(),
+            hits))
+        {
+            // Move to opposite direction if hit
+            Vector3 opposite_direction = Vector3(0, 0, 0);
+            
+            for (auto hit : hits)
+            {
+                opposite_direction += hit.hit_normal;
+            }
+            opposite_direction.normalise();
+            horizontal_direction -= opposite_direction;
+            final_position += horizontal_displacement.length() * horizontal_direction;
+        }
+        else
         {
             final_position += horizontal_displacement;
         }
