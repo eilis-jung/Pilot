@@ -19,6 +19,8 @@ namespace Piccolo
         void tick(float delta_time) override {}
         void updateGlobalTransform(const Transform& transform, bool is_scale_dirty);
         void getShapeBoundingBoxes(std::vector<AxisAlignedBox> & out_boudning_boxes) const;
+        uint32_t getRigidBodyID() const { return m_rigidbody_id; }
+
 
     protected:
         void createRigidBody(const Transform& global_transform);

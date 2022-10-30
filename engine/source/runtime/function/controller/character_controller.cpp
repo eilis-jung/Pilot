@@ -3,9 +3,13 @@
 #include "runtime/core/base/macro.h"
 
 #include "runtime/function/framework/component/motor/motor_component.h"
+#include "runtime/function/framework/component/rigidbody/rigidbody_component.h"
+#include "runtime/function/framework/component/transform/transform_component.h"
 #include "runtime/function/framework/world/world_manager.h"
 #include "runtime/function/global/global_context.h"
 #include "runtime/function/physics/physics_scene.h"
+#include "runtime/function/framework/level/level.h"
+#include "runtime/function/framework/object/object.h"
 
 namespace Piccolo
 {
@@ -79,6 +83,12 @@ namespace Piccolo
 
         hits.clear();
 
+        std::shared_ptr<Level> level = g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
+        if (level == nullptr)
+            return final_position;
+
+        auto& gomap = level->getAllGObjects();
+
         // side pass
         if (physics_scene->sweep(m_rigidbody_shape,
                                  world_transform.getMatrix(),
@@ -89,13 +99,32 @@ namespace Piccolo
             // Move to opposite direction if hit
             Vector3 opposite_direction = Vector3(0, 0, 0);
 
+            
+            std::vector<std::shared_ptr<GObject>> bodies;
+
             for (auto hit : hits)
             {
+                for (auto go : gomap)
+                {
+                    RigidBodyComponent* rgc = go.second->tryGetComponent<RigidBodyComponent>("RigidBodyComponent");
+                    if (rgc != nullptr && rgc->getRigidBodyID() == hit.body_id)
+                    {
+                        bodies.push_back(go.second);
+                    }
+                }
                 opposite_direction += hit.hit_normal;
             }
             opposite_direction.normalise();
             horizontal_direction -= opposite_direction;
             final_position += horizontal_displacement.length() * horizontal_direction;
+
+            for (auto body : bodies)
+            {
+                TransformComponent* tfc = body->tryGetComponent<TransformComponent>("TransformComponent");
+                Vector3           curr_pos = tfc->getPosition();
+                Vector3 final_horizontal_displacement = horizontal_displacement.length() * horizontal_direction;
+                tfc->setPosition(curr_pos + final_horizontal_displacement);
+            }
         }
         else
         {
