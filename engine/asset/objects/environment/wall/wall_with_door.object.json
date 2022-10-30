@@ -59,6 +59,7 @@
                 "rigidbody_res": {
                     "actor_type": 1,
                     "inverse_mass": 0,
+                    "mobility": false,
                     "shapes": [
                         {
                             "geometry": {
