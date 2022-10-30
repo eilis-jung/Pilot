@@ -2,10 +2,13 @@
 
 #include "runtime/core/base/macro.h"
 
+#include "runtime/function/framework/object/object.h"
+#include "runtime\function\framework\component\rigidbody\rigidbody_component.h"
 #include "runtime/function/framework/component/motor/motor_component.h"
 #include "runtime/function/framework/world/world_manager.h"
 #include "runtime/function/global/global_context.h"
 #include "runtime/function/physics/physics_scene.h"
+#include "runtime/function/framework/level/level.h"
 
 namespace Piccolo
 {
@@ -30,13 +33,89 @@ namespace Piccolo
             g_runtime_global_context.m_world_manager->getCurrentActivePhysicsScene().lock();
         ASSERT(physics_scene);
 
-        Vector3 final_position = current_position + displacement;
+        std::vector<PhysicsHitInfo> hits;
 
-        Transform final_transform = Transform(final_position, Quaternion::IDENTITY, Vector3::UNIT_SCALE);
+        Transform world_transform =
+            Transform(current_position + 0.1f * Vector3::UNIT_Z, Quaternion::IDENTITY, Vector3::UNIT_SCALE);
 
-        if (physics_scene->isOverlap(m_rigidbody_shape, final_transform.getMatrix()))
+        Vector3 vertical_displacement   = displacement.z * Vector3::UNIT_Z;
+        Vector3 horizontal_displacement = Vector3(displacement.x, displacement.y, 0.f);
+
+        Vector3 vertical_direction   = vertical_displacement.normalisedCopy();
+        Vector3 horizontal_direction = horizontal_displacement.normalisedCopy();
+
+        Vector3 final_position = current_position;
+
+        bool m_is_touch_ground = physics_scene->sweep(
+            m_rigidbody_shape, world_transform.getMatrix(), Vector3::NEGATIVE_UNIT_Z, 0.105f, hits);
+
+        hits.clear();
+
+        world_transform.m_position -= 0.1f * Vector3::UNIT_Z;
+
+        // vertical pass
+        if (physics_scene->sweep(m_rigidbody_shape,
+                                 world_transform.getMatrix(),
+                                 vertical_direction,
+                                 vertical_displacement.length(),
+                                 hits))
         {
-            final_position = current_position;
+            final_position += hits[0].hit_distance * vertical_direction;
+        }
+        else
+        {
+            final_position += vertical_displacement;
+        }
+
+        hits.clear();
+
+        std::shared_ptr<Level> level = g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
+         if (level == nullptr)
+             return final_position;
+
+        auto& gomap = level->getAllGObjects();
+
+        // side pass
+        if (physics_scene->sweep(m_rigidbody_shape,
+                                 world_transform.getMatrix(),
+                                 horizontal_direction,
+                                 horizontal_displacement.length(),
+                                 hits))
+        {
+            // Move to opposite direction if hit
+            Vector3 opposite_direction = Vector3(0, 0, 0);
+
+            std::vector<RigidBodyComponent*> bodies;
+            for (auto hit : hits)
+            {
+                auto ggg = hit.body_id;
+                for (auto go : gomap)
+                {
+                    RigidBodyComponent* rgc = go.second->tryGetComponent < RigidBodyComponent>("RigidBodyComponent");
+                    if (rgc != nullptr && rgc->getRigidBodyID() == hit.body_id)
+                    {
+                        bodies.push_back(rgc);
+                    }
+                }
+                opposite_direction += hit.hit_normal;
+            }
+            opposite_direction.normalise();
+            horizontal_direction -= opposite_direction;
+            final_position += horizontal_displacement.length() * horizontal_direction;
+
+            // Push the objects aside
+            for (auto body : bodies)
+            {
+                Transform curr_tr(body->getPhysicsActor()->getTransform());
+                Vector3   final_horizontal_displacement = horizontal_direction;
+                Transform new_tr(
+                    curr_tr.m_position + final_horizontal_displacement, curr_tr.m_rotation, curr_tr.m_scale);
+                body->updateGlobalTransform(new_tr);
+            }
+        }
+        else
+        {
+            final_position += horizontal_displacement;
         }
 
         return final_position;

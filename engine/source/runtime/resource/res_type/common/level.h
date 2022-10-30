@@ -8,7 +8,7 @@
 namespace Piccolo
 {
     REFLECTION_TYPE(LevelRes)
-    CLASS(LevelRes, Fields)
+    CLASS(LevelRes : public Component, Fields)
     {
         REFLECTION_BODY(LevelRes);
 

@@ -508,6 +508,14 @@ namespace Piccolo
 
         static ImGuiTableFlags flags                      = ImGuiTableFlags_Resizable | ImGuiTableFlags_NoSavedSettings;
         auto&&                 selected_object_components = selected_object->getComponents();
+
+
+        //std::shared_ptr<Level>
+        //               level = g_runtime_global_context.m_world_manager->getCurrentActiveLevel().lock();
+        //if (level == nullptr)
+        //    return;
+
+        //level->getLevelResUrl();
         for (auto component_ptr : selected_object_components)
         {
             m_editor_ui_creator["TreeNodePush"](("<" + component_ptr.getTypeName() + ">").c_str(), nullptr);

@@ -93,6 +93,7 @@ namespace Piccolo
         {
             const RigidBodyShape& shape = rigidbody_actor_res.m_shapes[shape_index];
 
+
             const Matrix4x4 shape_global_transform = global_transform.getMatrix() * shape.m_local_transform.getMatrix();
 
             Vector3    global_position, global_scale;

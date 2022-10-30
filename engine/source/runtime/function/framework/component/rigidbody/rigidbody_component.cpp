@@ -30,6 +30,11 @@ namespace Piccolo
         ASSERT(physics_scene);
 
         const uint32_t body_id = physics_scene->createRigidBody(parent_transform->getTransformConst(), m_rigidbody_res);
+
+        for (size_t shape_index = 0; shape_index < m_rigidbody_res.m_shapes.size(); shape_index++)
+        {
+            m_rigidbody_res.m_shapes[shape_index].m_parent_obj_id = m_parent_object.lock()->getID();
+        }
         m_physics_actor->setBodyID(body_id);
     }
 
@@ -57,11 +62,11 @@ namespace Piccolo
         // these code intended to fix transform of rigid bodies, but 
         // in JoltPhysics it removes local transform of shapes...
         // so currently rigid bodies cannot be transformed
-        //std::shared_ptr<PhysicsScene> physics_scene =
-        //    g_runtime_global_context.m_world_manager->getCurrentActivePhysicsScene().lock();
-        //ASSERT(physics_scene);
+        std::shared_ptr<PhysicsScene> physics_scene =
+            g_runtime_global_context.m_world_manager->getCurrentActivePhysicsScene().lock();
+        ASSERT(physics_scene);
 
-        //physics_scene->updateRigidBodyGlobalTransform(m_physics_actor->getBodyID(), transform);
+        physics_scene->updateRigidBodyGlobalTransform(m_physics_actor->getBodyID(), transform);
     }
 
 } // namespace Piccolo

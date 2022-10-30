@@ -24,6 +24,7 @@ namespace Piccolo
     public:
         Transform          m_global_transform;
         AxisAlignedBox     m_bounding_box;
+        int                m_parent_obj_id;
         RigidBodyShapeType m_type {RigidBodyShapeType::invalid};
 
         META(Enable)
@@ -46,5 +47,6 @@ namespace Piccolo
         std::vector<RigidBodyShape> m_shapes;
         float                       m_inverse_mass;
         int                         m_actor_type;
+        int                        m_mobility_type;
     };
 } // namespace Piccolo
