@@ -30,13 +30,76 @@ namespace Piccolo
             g_runtime_global_context.m_world_manager->getCurrentActivePhysicsScene().lock();
         ASSERT(physics_scene);
 
-        Vector3 final_position = current_position + displacement;
+        //Vector3 final_position = current_position + displacement;
 
-        Transform final_transform = Transform(final_position, Quaternion::IDENTITY, Vector3::UNIT_SCALE);
+        //Transform final_transform = Transform(final_position, Quaternion::IDENTITY, Vector3::UNIT_SCALE);
 
-        if (physics_scene->isOverlap(m_rigidbody_shape, final_transform.getMatrix()))
+        //if (physics_scene->isOverlap(m_rigidbody_shape, final_transform.getMatrix()))
+        //{
+        //    final_position = current_position;
+        //}
+
+        //return final_position;
+
+
+
+        std::vector<PhysicsHitInfo> hits;
+
+        Transform world_transform =
+            Transform(current_position + 0.1f * Vector3::UNIT_Z, Quaternion::IDENTITY, Vector3::UNIT_SCALE);
+
+        Vector3 vertical_displacement   = displacement.z * Vector3::UNIT_Z;
+        Vector3 horizontal_displacement = Vector3(displacement.x, displacement.y, 0.f);
+
+        Vector3 vertical_direction   = vertical_displacement.normalisedCopy();
+        Vector3 horizontal_direction = horizontal_displacement.normalisedCopy();
+
+        Vector3 final_position = current_position;
+
+        bool m_is_touch_ground = physics_scene->sweep(
+            m_rigidbody_shape, world_transform.getMatrix(), Vector3::NEGATIVE_UNIT_Z, 0.105f, hits);
+
+        hits.clear();
+
+        world_transform.m_position -= 0.1f * Vector3::UNIT_Z;
+
+        // vertical pass
+        if (physics_scene->sweep(m_rigidbody_shape,
+                                 world_transform.getMatrix(),
+                                 vertical_direction,
+                                 vertical_displacement.length(),
+                                 hits))
         {
-            final_position = current_position;
+            final_position += hits[0].hit_distance * vertical_direction;
+        }
+        else
+        {
+            final_position += vertical_displacement;
+        }
+
+        hits.clear();
+
+        // side pass
+        if (physics_scene->sweep(m_rigidbody_shape,
+                                 world_transform.getMatrix(),
+                                 horizontal_direction,
+                                 horizontal_displacement.length(),
+                                 hits))
+        {
+            // Move to opposite direction if hit
+            Vector3 opposite_direction = Vector3(0, 0, 0);
+
+            for (auto hit : hits)
+            {
+                opposite_direction += hit.hit_normal;
+            }
+            opposite_direction.normalise();
+            horizontal_direction -= opposite_direction;
+            final_position += horizontal_displacement.length() * horizontal_direction;
+        }
+        else
+        {
+            final_position += horizontal_displacement;
         }
 
         return final_position;
